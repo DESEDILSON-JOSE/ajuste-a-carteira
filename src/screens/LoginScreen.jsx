@@ -2,7 +2,7 @@ import { useContext, useState } from 'react'
 import { AppContext } from '../context/AppContext.jsx'
 
 export default function LoginScreen() {
-  const { signIn, signUp, resetPassword } = useContext(AppContext)
+  const { login: signIn, signup: signUp, resetPwd: resetPassword } = useContext(AppContext)
   const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
