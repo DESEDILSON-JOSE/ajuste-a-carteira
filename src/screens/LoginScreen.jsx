@@ -1,142 +1,253 @@
-import { useState } from 'react'
-import { useApp } from '../context/AppContext'
-import Spinner from '../components/Spinner'
+import { useContext, useState } from 'react'
+import { AppContext } from '../context/AppContext.jsx'
 
 export default function LoginScreen() {
-  const { login, signup, resetPwd, addToast } = useApp()
-  const [mode, setMode] = useState('login')
-  const [form, setForm] = useState({ email: '', password: '', confirmPwd: '', name: '' })
+  const { signIn, signUp, resetPassword } = useContext(AppContext)
+  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState({})
-  const [resetSent, setResetSent] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
 
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })) }
-
-  const validate = () => {
-    const e = {}
-    if (!form.email) e.email = 'Email obrigatório'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Email inválido'
-    if (mode !== 'forgot') {
-      if (!form.password) e.password = 'Senha obrigatória'
-      else if (form.password.length < 8) e.password = 'Mínimo 8 caracteres'
-    }
-    if (mode === 'signup') {
-      if (!form.name) e.name = 'Nome obrigatório'
-      if (form.confirmPwd !== form.password) e.confirmPwd = 'Senhas não coincidem'
-    }
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
-  const handleSubmit = async () => {
-    if (!validate()) return
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     setLoading(true)
+    setError('')
+    setMessage('')
     try {
       if (mode === 'login') {
-        await login(form.email, form.password)
+        await signIn(email, password)
       } else if (mode === 'signup') {
-        await signup(form.email, form.password, form.name)
-        addToast('Conta criada! Verifique seu email se necessário.', 'info')
-      } else {
-        await resetPwd(form.email)
-        setResetSent(true)
+        await signUp(email, password, name)
+        setMessage('Conta criada! Verifique seu e-mail.')
+      } else if (mode === 'reset') {
+        await resetPassword(email)
+        setMessage('Link enviado! Verifique seu e-mail.')
       }
     } catch (err) {
-      addToast(err.message, 'error')
+      setError(err.message || 'Ocorreu um erro. Tente novamente.')
     } finally {
       setLoading(false)
     }
   }
 
-  const inputStyle = (field) => ({ marginBottom: 4, borderColor: errors[field] ? '#ef4444' : undefined })
+  const styles = {
+    page: {
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+      padding: '20px',
+    },
+    container: {
+      width: '100%',
+      maxWidth: '420px',
+    },
+    logo: {
+      textAlign: 'center',
+      marginBottom: '32px',
+    },
+    logoIcon: {
+      fontSize: '48px',
+      marginBottom: '12px',
+      display: 'block',
+    },
+    logoTitle: {
+      fontSize: '26px',
+      fontWeight: '800',
+      color: '#ffffff',
+      letterSpacing: '2px',
+      margin: '0 0 4px 0',
+    },
+    logoSub: {
+      fontSize: '13px',
+      color: '#94a3b8',
+      margin: 0,
+      letterSpacing: '1px',
+    },
+    card: {
+      background: 'rgba(255,255,255,0.05)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: '20px',
+      padding: '36px 32px',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+    },
+    cardTitle: {
+      fontSize: '20px',
+      fontWeight: '700',
+      color: '#f1f5f9',
+      margin: '0 0 24px 0',
+    },
+    formGroup: {
+      marginBottom: '16px',
+    },
+    label: {
+      display: 'block',
+      fontSize: '13px',
+      fontWeight: '600',
+      color: '#94a3b8',
+      marginBottom: '8px',
+      letterSpacing: '0.5px',
+    },
+    input: {
+      width: '100%',
+      padding: '12px 16px',
+      background: 'rgba(255,255,255,0.08)',
+      border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: '10px',
+      fontSize: '15px',
+      color: '#f1f5f9',
+      outline: 'none',
+      boxSizing: 'border-box',
+      transition: 'border-color 0.2s',
+    },
+    button: {
+      width: '100%',
+      padding: '13px',
+      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      border: 'none',
+      borderRadius: '10px',
+      fontSize: '15px',
+      fontWeight: '700',
+      color: '#ffffff',
+      cursor: 'pointer',
+      marginTop: '8px',
+      letterSpacing: '0.5px',
+      transition: 'opacity 0.2s',
+      opacity: loading ? 0.7 : 1,
+    },
+    linkBtn: {
+      background: 'none',
+      border: 'none',
+      color: '#60a5fa',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '600',
+      padding: '0',
+      textDecoration: 'underline',
+    },
+    footer: {
+      marginTop: '20px',
+      textAlign: 'center',
+      fontSize: '14px',
+      color: '#64748b',
+    },
+    error: {
+      background: 'rgba(239,68,68,0.15)',
+      border: '1px solid rgba(239,68,68,0.3)',
+      borderRadius: '8px',
+      padding: '10px 14px',
+      color: '#fca5a5',
+      fontSize: '13px',
+      marginBottom: '16px',
+    },
+    success: {
+      background: 'rgba(34,197,94,0.15)',
+      border: '1px solid rgba(34,197,94,0.3)',
+      borderRadius: '8px',
+      padding: '10px 14px',
+      color: '#86efac',
+      fontSize: '13px',
+      marginBottom: '16px',
+    },
+    divider: {
+      height: '1px',
+      background: 'rgba(255,255,255,0.08)',
+      margin: '20px 0',
+    },
+  }
+
+  const titles = { login: 'Entrar na sua conta', signup: 'Criar nova conta', reset: 'Recuperar senha' }
+  const btnLabels = { login: loading ? 'Entrando...' : 'Entrar', signup: loading ? 'Criando...' : 'Criar conta', reset: loading ? 'Enviando...' : 'Enviar link' }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0f172a,#1e3a5f)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
-      {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>💰</div>
-        <div style={{ color: '#fff', fontSize: 22, fontWeight: 700, letterSpacing: 2 }}>AJUSTE A CARTEIRA</div>
-        <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginTop: 4 }}>Finanças pessoais + Negócio</div>
-      </div>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.logo}>
+          <span style={styles.logoIcon}>💰</span>
+          <h1 style={styles.logoTitle}>AJUSTE A CARTEIRA</h1>
+          <p style={styles.logoSub}>Finanças pessoais + Negócio</p>
+        </div>
 
-      {/* Card */}
-      <div style={{ background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 360 }}>
-        {mode === 'forgot' ? (
-          resetSent ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
-              <p style={{ fontWeight: 700, marginBottom: 8 }}>Email enviado!</p>
-              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Verifique sua caixa de entrada e siga o link para redefinir sua senha.</p>
-              <button className="btn btn-dark btn-full" onClick={() => { setMode('login'); setResetSent(false) }}>Voltar ao login</button>
-            </div>
-          ) : (
-            <>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Esqueci a senha</h2>
-              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Enviaremos um link para redefinir sua senha.</p>
-              <label className="label">Email</label>
-              <input className="input" type="email" placeholder="seu@email.com" value={form.email} onChange={e => set('email', e.target.value)} style={{ marginBottom: errors.email ? 4 : 16, ...inputStyle('email') }} />
-              {errors.email && <p className="field-error">{errors.email}</p>}
-              <button className="btn btn-dark btn-full" onClick={handleSubmit} disabled={loading} style={{ marginBottom: 12 }}>
-                {loading ? <Spinner size={18} color="#fff" /> : 'Enviar Link'}
-              </button>
-              <button className="btn btn-ghost btn-full" onClick={() => setMode('login')}>Voltar ao login</button>
-            </>
-          )
-        ) : (
-          <>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>
-              {mode === 'login' ? 'Entrar' : 'Criar Conta'}
-            </h2>
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>{titles[mode]}</h2>
 
+          {error && <div style={styles.error}>⚠️ {error}</div>}
+          {message && <div style={styles.success}>✅ {message}</div>}
+
+          <form onSubmit={handleSubmit}>
             {mode === 'signup' && (
-              <>
-                <label className="label">Nome</label>
-                <input className="input" placeholder="Seu nome" value={form.name} onChange={e => set('name', e.target.value)} style={{ marginBottom: errors.name ? 4 : 12, ...inputStyle('name') }} />
-                {errors.name && <p className="field-error" style={{ marginBottom: 8 }}>{errors.name}</p>}
-              </>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>NOME COMPLETO</label>
+                <input
+                  style={styles.input}
+                  type="text"
+                  placeholder="Seu nome"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  required
+                />
+              </div>
             )}
 
-            <label className="label">Email</label>
-            <input className="input" type="email" placeholder="seu@email.com" value={form.email} onChange={e => set('email', e.target.value)} style={{ marginBottom: errors.email ? 4 : 12, ...inputStyle('email') }} />
-            {errors.email && <p className="field-error" style={{ marginBottom: 8 }}>{errors.email}</p>}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>E-MAIL</label>
+              <input
+                style={styles.input}
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-            <label className="label">Senha</label>
-            <input className="input" type="password" placeholder="••••••••" value={form.password} onChange={e => set('password', e.target.value)} style={{ marginBottom: errors.password ? 4 : 12, ...inputStyle('password') }} />
-            {errors.password && <p className="field-error" style={{ marginBottom: 8 }}>{errors.password}</p>}
-
-            {mode === 'signup' && (
-              <>
-                <label className="label">Confirmar Senha</label>
-                <input className="input" type="password" placeholder="••••••••" value={form.confirmPwd} onChange={e => set('confirmPwd', e.target.value)} style={{ marginBottom: errors.confirmPwd ? 4 : 12, ...inputStyle('confirmPwd') }} />
-                {errors.confirmPwd && <p className="field-error" style={{ marginBottom: 8 }}>{errors.confirmPwd}</p>}
-              </>
+            {mode !== 'reset' && (
+              <div style={styles.formGroup}>
+                <label style={styles.label}>SENHA</label>
+                <input
+                  style={styles.input}
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+              </div>
             )}
 
             {mode === 'login' && (
-              <div style={{ textAlign: 'right', marginBottom: 16 }}>
-                <button style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: 13, cursor: 'pointer' }} onClick={() => setMode('forgot')}>
+              <div style={{ textAlign: 'right', marginBottom: '4px' }}>
+                <button type="button" style={styles.linkBtn} onClick={() => { setMode('reset'); setError(''); setMessage('') }}>
                   Esqueci minha senha
                 </button>
               </div>
             )}
 
-            <button className="btn btn-dark btn-full" onClick={handleSubmit} disabled={loading} style={{ marginBottom: 12 }}>
-              {loading ? <Spinner size={18} color="#fff" /> : mode === 'login' ? 'ENTRAR' : 'CRIAR CONTA'}
+            <button type="submit" style={styles.button} disabled={loading}>
+              {btnLabels[mode]}
             </button>
+          </form>
 
-            <div style={{ textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-              {mode === 'login' ? (
-                <>Não tem conta?{' '}
-                  <button style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontWeight: 600 }} onClick={() => setMode('signup')}>Criar conta</button>
-                </>
-              ) : (
-                <>Já tem conta?{' '}
-                  <button style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontWeight: 600 }} onClick={() => setMode('login')}>Entrar</button>
-                </>
-              )}
-            </div>
-          </>
-        )}
+          <div style={styles.divider} />
+
+          <div style={styles.footer}>
+            {mode === 'login' && (
+              <>Não tem conta?{' '}<button style={styles.linkBtn} onClick={() => { setMode('signup'); setError(''); setMessage('') }}>Criar conta</button></>
+            )}
+            {mode === 'signup' && (
+              <>Já tem conta?{' '}<button style={styles.linkBtn} onClick={() => { setMode('login'); setError(''); setMessage('') }}>Entrar</button></>
+            )}
+            {mode === 'reset' && (
+              <button style={styles.linkBtn} onClick={() => { setMode('login'); setError(''); setMessage('') }}>← Voltar ao login</button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
