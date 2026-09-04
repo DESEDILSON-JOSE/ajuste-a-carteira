@@ -43,41 +43,27 @@ export default function NavBar() {
     }}>
       {NAV.map(item =>
         item.id === '__fab__' ? (
-          <div
-            key="fab-wrap"
+          <button
+            key="fab"
+            onClick={() => handleNav('__fab__')}
             style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              color: '#fff',
+              fontSize: 30,
+              border: '3px solid rgba(15,23,42,0.96)',
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(59,130,246,0.6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              position: 'relative',
-              width: 56,
-              height: '100%',
+              marginTop: '-26px',
+              lineHeight: 1,
+              flexShrink: 0,
             }}
-          >
-            <button
-              onClick={() => handleNav('__fab__')}
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, calc(-50% - 16px))',
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: '#fff',
-                fontSize: 28,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(59,130,246,0.55)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1,
-                flexShrink: 0,
-              }}
-            >+</button>
-          </div>
+          >+</button>
         ) : (
           <button
             key={item.id}
