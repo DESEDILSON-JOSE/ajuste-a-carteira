@@ -39,30 +39,45 @@ export default function NavBar() {
       padding: '10px 8px',
       zIndex: 100,
       border: '1px solid rgba(255,255,255,0.08)',
+      overflow: 'visible',
     }}>
       {NAV.map(item =>
         item.id === '__fab__' ? (
-          <button
-            key="fab"
-            onClick={() => handleNav('__fab__')}
+          <div
+            key="fab-wrap"
             style={{
-              width: 52,
-              height: 52,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-              color: '#fff',
-              fontSize: 28,
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(59,130,246,0.55)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginTop: '-22px',
-              lineHeight: 1,
-              flexShrink: 0,
+              position: 'relative',
+              width: 56,
+              height: '100%',
             }}
-          >+</button>
+          >
+            <button
+              onClick={() => handleNav('__fab__')}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, calc(-50% - 16px))',
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: '#fff',
+                fontSize: 28,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(59,130,246,0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >+</button>
+          </div>
         ) : (
           <button
             key={item.id}
