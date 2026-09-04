@@ -67,7 +67,7 @@ export default function AddTransactionModal() {
               value={form.value}
               onChange={e => set('value', e.target.value)}
               placeholder="0,00"
-              style={{ fontSize: 36, fontWeight: 700, color: typeColor, border: 'none', outline: 'none', width: 160, textAlign: 'center', fontFamily: 'inherit' }}
+              style={{ fontSize: 36, fontWeight: 700, color: typeColor, border: 'none', outline: 'none', width: 160, textAlign: 'center', fontFamily: 'inherit', background: 'transparent' }}
             />
           </div>
         </div>
