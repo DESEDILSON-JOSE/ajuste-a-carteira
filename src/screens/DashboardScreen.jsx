@@ -204,7 +204,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Dicas inteligentes */}
-        <div className="card" style={{ background: '#f8fafc' }}>
+        <div className="card" >
           <div className="card-title">💡 Dicas</div>
           {tips.map((tip, i) => (
             <div key={i} style={{ fontSize: 13, color: '#334155', marginBottom: 6, lineHeight: 1.4 }}>{tip}</div>
