@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { CATS_EXPENSE, CATS_INCOME, ACCOUNTS, todayStr } from '../../utils/formatters'
+import { CATS_EXPENSE, CATS_INCOME, ACCOUNTS, todayStr, R$ } from '../../utils/formatters'
 
 const TYPES = [
   { id: 'expense', label: 'Despesa', color: '#ef4444' },
@@ -8,12 +8,15 @@ const TYPES = [
   { id: 'transfer', label: 'Transferência', color: '#3b82f6' },
 ]
 
+const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
+
 export default function AddTransactionModal() {
   const { dispatch, addTx } = useApp()
   const [type, setType] = useState('expense')
   const [form, setForm] = useState({
     description: '', value: '', date: todayStr(),
     category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
+    installments: 1,
   })
   const [loading, setLoading] = useState(false)
 
@@ -21,6 +24,10 @@ export default function AddTransactionModal() {
 
   const cats = type === 'income' ? CATS_INCOME : CATS_EXPENSE
   const typeColor = TYPES.find(t => t.id === type)?.color
+  const isCredit = form.account === 'Cartão de Crédito'
+  const parcVal = form.value && form.installments > 1
+    ? `${form.installments}x de ${R$(parseFloat(form.value) / form.installments)}`
+    : ''
 
   const handleSave = async () => {
     if (!form.value || !form.description) return
@@ -34,6 +41,7 @@ export default function AddTransactionModal() {
       account: form.account,
       paid: type === 'income' ? true : form.paid,
       notes: form.notes,
+      installments: isCredit ? form.installments : 1,
     })
     setLoading(false)
     close()
@@ -70,6 +78,9 @@ export default function AddTransactionModal() {
               style={{ fontSize: 36, fontWeight: 700, color: typeColor, border: 'none', outline: 'none', width: 160, textAlign: 'center', fontFamily: 'inherit', background: 'transparent' }}
             />
           </div>
+          {parcVal && (
+            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{parcVal}</div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -90,6 +101,20 @@ export default function AddTransactionModal() {
               </select>
             </div>
           </div>
+
+          {/* Parcelas — aparece só quando Cartão de Crédito */}
+          {isCredit && type === 'expense' && (
+            <div>
+              <label className="label">Parcelas</label>
+              <select className="input" value={form.installments} onChange={e => set('installments', parseInt(e.target.value))}>
+                {PARCELAS.map(n => (
+                  <option key={n} value={n}>
+                    {n === 1 ? '1x (à vista)' : `${n}x${form.value ? ` de ${R$(parseFloat(form.value) / n)}` : ''}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="label">Categoria</label>

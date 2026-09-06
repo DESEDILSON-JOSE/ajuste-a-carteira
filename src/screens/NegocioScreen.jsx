@@ -297,6 +297,30 @@ function DreTab({ lots, userId }) {
       )}
 
       <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : '💾 Salvar DRE'}</button>
+
+      {/* Integração ao Orçamento Pessoal */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="card-title">💼 Integrar ao Orçamento Pessoal</div>
+        <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 12, lineHeight: 1.6 }}>
+          Adicione o Lucro Líquido mensal do negócio à sua renda pessoal para cálculo de comprometimento.
+          <br /><b style={{ color: 'var(--text)' }}>Lucro Líquido: {R$(calc.lucro_liq)}</b>
+        </div>
+        <button className="btn btn-green btn-full" onClick={() => {
+          const val = calc.lucro_liq > 0 ? calc.lucro_liq : 0
+          localStorage.setItem('businessMonthlyIncome', String(val))
+          addToast(val > 0 ? `✓ Renda do negócio integrada: ${R$(val)}/mês` : 'Renda zerada (lucro negativo)', val > 0 ? 'success' : 'error')
+        }}>
+          💼 Integrar {R$(Math.max(0, calc.lucro_liq))}/mês ao Orçamento
+        </button>
+        {parseFloat(localStorage.getItem('businessMonthlyIncome') || '0') > 0 && (
+          <button className="btn btn-ghost btn-full" style={{ marginTop: 8 }} onClick={() => {
+            localStorage.removeItem('businessMonthlyIncome')
+            addToast('Renda do negócio removida do orçamento', 'info')
+          }}>
+            ✕ Remover integração
+          </button>
+        )}
+      </div>
     </div>
   )
 }
