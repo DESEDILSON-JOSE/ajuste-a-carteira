@@ -21,7 +21,7 @@ export default function LoginScreen() {
         await signIn(email, password)
       } else if (mode === 'signup') {
         await signUp(email, password, name)
-        setMessage('Conta criada! Verifique seu e-mail.')
+        setMessage('Conta criada! Aguardando aprovação do administrador.')
       } else if (mode === 'reset') {
         await resetPassword(email)
         setMessage('Link enviado! Verifique seu e-mail.')

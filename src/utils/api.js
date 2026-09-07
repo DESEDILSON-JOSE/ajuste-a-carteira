@@ -123,3 +123,21 @@ export const vplAPI = {
   delete: async (id) =>
     handle(supabase.from('vpl_projects').delete().eq('id', id)),
 }
+
+export const adminAPI = {
+  getAllProfiles: async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data
+  },
+  updateStatus: async (userId, status) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status })
+      .eq('id', userId)
+    if (error) throw error
+  },
+}

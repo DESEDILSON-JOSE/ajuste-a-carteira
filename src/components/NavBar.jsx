@@ -1,6 +1,8 @@
 import { useApp } from '../context/AppContext'
 
-const NAV = [
+const ADMIN_EMAIL = 'desedilson@hotmail.com'
+
+const NAV_DEFAULT = [
   { id: 'dashboard', icon: '🏠', label: 'Principal' },
   { id: 'txs', icon: '💳', label: 'Transações' },
   { id: '__fab__', icon: '+', label: '' },
@@ -8,9 +10,19 @@ const NAV = [
   { id: 'negocio', icon: '💼', label: 'Negócio' },
 ]
 
+const NAV_ADMIN = [
+  { id: 'dashboard', icon: '🏠', label: 'Principal' },
+  { id: 'txs', icon: '💳', label: 'Transações' },
+  { id: '__fab__', icon: '+', label: '' },
+  { id: 'planejamento', icon: '🎯', label: 'Planejar' },
+  { id: 'admin', icon: '🛡️', label: 'Admin' },
+]
+
 export default function NavBar() {
   const { state, dispatch } = useApp()
-  const { activeTab } = state
+  const { activeTab, user } = state
+  const isAdmin = user?.email === ADMIN_EMAIL
+  const NAV = isAdmin ? NAV_ADMIN : NAV_DEFAULT
 
   const handleNav = (id) => {
     if (id === '__fab__') {

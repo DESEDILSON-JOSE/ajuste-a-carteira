@@ -100,7 +100,13 @@ export function AppProvider({ children }) {
         lotsAPI.getAll(userId),
         vplAPI.getAll(userId),
       ])
-      if (profileRes.data) dispatch({ type: 'SET_PROFILE', profile: profileRes.data })
+      let profileData = profileRes.data
+      if (!profileData) {
+        await new Promise(r => setTimeout(r, 900))
+        const retry = await profileAPI.get(userId)
+        profileData = retry.data
+      }
+      if (profileData) dispatch({ type: 'SET_PROFILE', profile: profileData })
       dispatch({ type: 'SET_TXS', transactions: txs || [] })
       let finalGoals = goals || []
       if (finalGoals.length === 0) {
