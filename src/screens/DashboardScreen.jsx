@@ -31,13 +31,11 @@ function HealthTicker({ transactions }) {
     const anualInc = transactions.filter(t => t.type === 'income' && new Date(t.date + 'T12:00:00').getFullYear() === year).reduce((s, t) => s + t.value, 0)
     const anualExp = transactions.filter(t => t.type === 'expense' && new Date(t.date + 'T12:00:00').getFullYear() === year).reduce((s, t) => s + t.value, 0)
 
-    const result = months
-      .filter(m => m.hasData)
-      .map(m => ({
-        text: `${m.label}: ${m.saldo >= 0 ? '+' : ''}${R$(m.saldo)}`,
-        color: m.saldo >= 0 ? '#4ade80' : '#f87171',
-        icon: m.saldo >= 0 ? '🟢' : '🔴',
-      }))
+    const result = months.map(m => ({
+      text: `${m.label}: ${m.saldo >= 0 ? '+' : ''}${R$(m.saldo)}`,
+      color: m.saldo === 0 ? '#94a3b8' : m.saldo > 0 ? '#4ade80' : '#f87171',
+      icon: m.saldo === 0 ? '⚪' : m.saldo > 0 ? '🟢' : '🔴',
+    }))
 
     result.push({
       text: `${year} (anual): ${anualInc - anualExp >= 0 ? '+' : ''}${R$(anualInc - anualExp)}`,
@@ -48,7 +46,7 @@ function HealthTicker({ transactions }) {
     return result
   }, [transactions, year])
 
-  if (items.length <= 1) return null
+  if (!items.length) return null
 
   const tickerText = items.map(i => `${i.icon} ${i.text}`).join('   •   ')
   const full = tickerText + '   •   ' + tickerText // duplicate for seamless loop
