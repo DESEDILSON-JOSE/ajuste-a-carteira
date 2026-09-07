@@ -681,15 +681,26 @@ function MinhaContaTab() {
   const [income, setIncome] = useState(profile?.income || 3000)
   const [pwd, setPwd] = useState({ new: '', confirm: '' })
   const [saving, setSaving] = useState(false)
+  const [members, setMembers] = useState(profile?.members || [])
+  const [newMember, setNewMember] = useState('')
 
   const savePerfil = async () => {
     setSaving(true)
     try {
-      await profileAPI.update(user.id, { name, income: parseFloat(income) || 0 })
+      await profileAPI.update(user.id, { name, income: parseFloat(income) || 0, members })
       addToast('Perfil salvo!')
     } catch { addToast('Erro ao salvar', 'error') }
     setSaving(false)
   }
+
+  const addMember = () => {
+    const m = newMember.trim()
+    if (!m || members.includes(m)) return
+    setMembers(prev => [...prev, m])
+    setNewMember('')
+  }
+
+  const removeMember = (m) => setMembers(prev => prev.filter(x => x !== m))
 
   const savePwd = async () => {
     if (pwd.new !== pwd.confirm) { addToast('Senhas não coincidem', 'error'); return }
@@ -717,6 +728,34 @@ function MinhaContaTab() {
           <div><label className="label">Confirmar senha</label><input className="input" type="password" value={pwd.confirm} onChange={e => setPwd(p => ({ ...p, confirm: e.target.value }))} /></div>
           <button className="btn btn-dark btn-full" onClick={savePwd}>Alterar Senha</button>
         </div>
+      </div>
+
+      {/* Membros da família */}
+      <div className="card">
+        <div className="card-title">👥 Membros da família</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+          Esses nomes aparecem no campo "Para quem?" ao lançar transações.
+        </div>
+        {members.map(m => (
+          <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: 14 }}>👤 {m}</span>
+            <button onClick={() => removeMember(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 18, lineHeight: 1 }}>×</button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <input
+            className="input"
+            placeholder="Nome do membro..."
+            value={newMember}
+            onChange={e => setNewMember(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addMember()}
+            style={{ flex: 1 }}
+          />
+          <button className="btn btn-dark" onClick={addMember} style={{ flexShrink: 0 }}>+ Adicionar</button>
+        </div>
+        <button className="btn btn-dark btn-full" onClick={savePerfil} disabled={saving} style={{ marginTop: 10 }}>
+          {saving ? 'Salvando...' : 'Salvar membros'}
+        </button>
       </div>
 
       <div className="card" style={{ background: '#f8fafc' }}>

@@ -159,6 +159,9 @@ export default function DashboardScreen() {
 
   return (
     <div>
+      {/* Faixa de Saúde Financeira — acima do cabeçalho */}
+      <HealthTicker transactions={transactions} />
+
       {/* Header */}
       <div className="hdr hdr-dark">
         <UserHeader />
@@ -187,9 +190,6 @@ export default function DashboardScreen() {
           )}
         </div>
       </div>
-
-      {/* Faixa de Saúde Financeira */}
-      <HealthTicker transactions={transactions} />
 
       <div style={{ padding: '0 16px' }}>
         {/* Alertas */}
@@ -272,7 +272,7 @@ export default function DashboardScreen() {
                 <div style={{ fontSize: 22 }}>{CAT_ICON[t.category] || '📌'}</div>
                 <div className="tx-info">
                   <div className="tx-desc">{t.description}</div>
-                  <div className="tx-sub">{t.category} · {fmtDate(t.date)}</div>
+                  <div className="tx-sub">{t.category} · {fmtDate(t.date)}{t.person ? ` · 👤 ${t.person}` : ''}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className={`tx-value ${t.type === 'income' ? 'income' : 'expense'}`}>

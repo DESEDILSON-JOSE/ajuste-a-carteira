@@ -11,12 +11,12 @@ const TYPES = [
 const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
 
 export default function AddTransactionModal() {
-  const { dispatch, addTx } = useApp()
+  const { dispatch, addTx, state } = useApp()
   const [type, setType] = useState('expense')
   const [form, setForm] = useState({
     description: '', value: '', date: todayStr(),
     category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
-    installments: 1,
+    installments: 1, person: '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -28,6 +28,9 @@ export default function AddTransactionModal() {
   const parcVal = form.value && form.installments > 1
     ? `${form.installments}x de ${R$(parseFloat(form.value) / form.installments)}`
     : ''
+
+  // Lista de membros do perfil ou padrão
+  const members = state.profile?.members || []
 
   const handleSave = async () => {
     if (!form.value || !form.description) return
@@ -42,6 +45,7 @@ export default function AddTransactionModal() {
       paid: type === 'income' ? true : form.paid,
       notes: form.notes,
       installments: isCredit ? form.installments : 1,
+      person: form.person || null,
     })
     setLoading(false)
     close()
@@ -122,6 +126,27 @@ export default function AddTransactionModal() {
               {cats.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
+
+          {/* Para quem? */}
+          {members.length > 0 ? (
+            <div>
+              <label className="label">👤 Para quem?</label>
+              <select className="input" value={form.person} onChange={e => set('person', e.target.value)}>
+                <option value="">— Geral (todos) —</option>
+                {members.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="label">👤 Para quem? <span style={{ fontSize: 10, color: '#94a3b8' }}>(configure membros em Conta)</span></label>
+              <input
+                className="input"
+                placeholder="Ex: Desedilson, Jackellyne..."
+                value={form.person}
+                onChange={e => set('person', e.target.value)}
+              />
+            </div>
+          )}
 
           {type === 'expense' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
