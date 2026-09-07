@@ -69,9 +69,18 @@ export const CATS_INCOME = [
 ]
 
 export const ACCOUNTS = [
-  'Dinheiro', 'Conta Corrente', 'Poupança',
+  'Dinheiro', 'Pix', 'Conta Corrente', 'Poupança',
   'Cartão de Crédito', 'Cartão de Débito',
 ]
+
+export const ACCOUNT_ICON = {
+  'Dinheiro': '💵',
+  'Pix': '⚡',
+  'Conta Corrente': '🏦',
+  'Poupança': '🐖',
+  'Cartão de Crédito': '💳',
+  'Cartão de Débito': '💳',
+}
 
 export const translateError = err => {
   const map = {

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { useApp } from '../context/AppContext'
-import { R$, pct, CAT_COLOR, CAT_ICON, MONTHS, fmtDate } from '../utils/formatters'
+import { R$, pct, CAT_COLOR, CAT_ICON, MONTHS, fmtDate, ACCOUNTS, ACCOUNT_ICON } from '../utils/formatters'
 import { profileAPI } from '../utils/api'
 
 // ─── 7 DIAS ────────────────────────────────────────────────
@@ -529,6 +529,150 @@ function OrcamentoTab({ transactions }) {
   )
 }
 
+// ─── CONTAS ────────────────────────────────────────────────
+function ContasTab({ transactions }) {
+  const now = new Date()
+  const [selM, setSelM] = useState(now.getMonth() + 1)
+  const [selY, setSelY] = useState(now.getFullYear())
+  const [expanded, setExpanded] = useState(null)
+
+  const changeMonth = (delta) => {
+    let m = selM + delta, y = selY
+    if (m > 12) { m = 1; y++ }
+    if (m < 1) { m = 12; y-- }
+    setSelM(m); setSelY(y)
+  }
+
+  const { monthTxs, byAccount, totals } = useMemo(() => {
+    const monthTxs = transactions.filter(t => {
+      const d = new Date(t.date + 'T12:00:00')
+      return d.getMonth() + 1 === selM && d.getFullYear() === selY
+    })
+
+    // Group by account — use 'Dinheiro' as default when account not set
+    const byAccount = {}
+    monthTxs.forEach(t => {
+      const acc = t.account || 'Dinheiro'
+      if (!byAccount[acc]) byAccount[acc] = { inc: 0, exp: 0, txs: [] }
+      if (t.type === 'income') byAccount[acc].inc += t.value
+      else if (t.type === 'expense') byAccount[acc].exp += t.value
+      byAccount[acc].txs.push(t)
+    })
+
+    const totals = {
+      inc: monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0),
+      exp: monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0),
+    }
+
+    return { monthTxs, byAccount, totals }
+  }, [transactions, selM, selY])
+
+  // Sort accounts: those with data first, ordered by total movement (inc + exp) desc
+  const accountEntries = Object.entries(byAccount).sort((a, b) => (b[1].inc + b[1].exp) - (a[1].inc + a[1].exp))
+
+  return (
+    <div>
+      {/* Month selector */}
+      <div className="period-sel" style={{ justifyContent: 'center', marginBottom: 16 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(-1)}>‹</button>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>{MONTHS[selM - 1]} {selY}</span>
+        <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(1)}>›</button>
+      </div>
+
+      {/* Total summary */}
+      <div className="g2" style={{ marginBottom: 12 }}>
+        <div className="stat">
+          <div className="stat-label">Total Receitas</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#15803d' }}>{R$(totals.inc)}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Total Despesas</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#dc2626' }}>{R$(totals.exp)}</div>
+        </div>
+      </div>
+
+      {accountEntries.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--cinza)' }}>
+          <div style={{ fontSize: 40 }}>💳</div>
+          <div style={{ marginTop: 8 }}>Nenhuma transação neste mês</div>
+        </div>
+      ) : (
+        accountEntries.map(([accName, data]) => {
+          const saldo = data.inc - data.exp
+          const isOpen = expanded === accName
+          const icon = ACCOUNT_ICON[accName] || '💳'
+
+          return (
+            <div key={accName} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden' }}>
+              {/* Account header — tap to expand */}
+              <button
+                onClick={() => setExpanded(isOpen ? null : accName)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 16px', background: 'none', border: 'none',
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 24 }}>{icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{accName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--cinza)', marginTop: 2 }}>
+                    {data.txs.length} transaç{data.txs.length === 1 ? 'ão' : 'ões'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: saldo >= 0 ? '#15803d' : '#dc2626' }}>
+                    {saldo >= 0 ? '+' : ''}{R$(saldo)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)', marginTop: 2 }}>
+                    {isOpen ? '▲' : '▼'}
+                  </div>
+                </div>
+              </button>
+
+              {/* Expanded detail */}
+              {isOpen && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0 16px 12px' }}>
+                  {/* Inc / Exp row */}
+                  <div className="g2" style={{ marginTop: 12, marginBottom: 12 }}>
+                    <div style={{ background: 'rgba(34,197,94,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 2 }}>↑ Receitas</div>
+                      <div style={{ fontWeight: 700, color: '#15803d', fontSize: 14 }}>{R$(data.inc)}</div>
+                    </div>
+                    <div style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#f87171', marginBottom: 2 }}>↓ Despesas</div>
+                      <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{R$(data.exp)}</div>
+                    </div>
+                  </div>
+
+                  {/* Transaction list */}
+                  {data.txs.sort((a, b) => b.date.localeCompare(a.date)).map(t => (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13 }}>
+                      <span style={{ fontSize: 18 }}>{CAT_ICON[t.category] || '📌'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description}</div>
+                        <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{t.category} · {fmtDate(t.date)}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontWeight: 700, color: t.type === 'income' ? '#15803d' : '#dc2626' }}>
+                          {t.type === 'income' ? '+' : '-'}{R$(t.value)}
+                        </div>
+                        {t.type === 'expense' && !t.paid && (
+                          <span className="badge badge-orange" style={{ fontSize: 10 }}>pendente</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
 // ─── MINHA CONTA ──────────────────────────────────────────
 function MinhaContaTab() {
   const { state, logout, updateIncome, updatePwd, addToast } = useApp()
@@ -604,12 +748,12 @@ export default function RelatoriosScreen() {
     <div>
       <div className="hdr hdr-purple">
         <h1>Relatórios</h1>
-        <p>7 dias · Mensal · Anual · Fixos · Orçamento</p>
+        <p>7 dias · Mensal · Anual · Fixos · Orçamento · Contas</p>
       </div>
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {[['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['fixos', 'Fixos'], ['orcamento', 'Orçamento'], ['conta', 'Conta']].map(([id, label]) => (
+          {[['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['fixos', 'Fixos'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} style={{ flex: 'none', minWidth: 'max-content', padding: '9px 12px' }} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -619,6 +763,7 @@ export default function RelatoriosScreen() {
         {subTab === 'anual' && <AnualTab transactions={transactions} />}
         {subTab === 'fixos' && <GastosFixosTab />}
         {subTab === 'orcamento' && <OrcamentoTab transactions={transactions} />}
+        {subTab === 'contas' && <ContasTab transactions={transactions} />}
         {subTab === 'conta' && <MinhaContaTab />}
 
         {/* Links */}

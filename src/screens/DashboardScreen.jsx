@@ -13,6 +13,85 @@ const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) =>
   return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="600">{`${(percent * 100).toFixed(0)}%`}</text>
 }
 
+// ── Faixa de Saúde Financeira ──────────────────────────────
+function HealthTicker({ transactions }) {
+  const year = new Date().getFullYear()
+
+  const items = useMemo(() => {
+    const months = MONTHS.map((label, mi) => {
+      const txs = transactions.filter(t => {
+        const d = new Date(t.date + 'T12:00:00')
+        return d.getMonth() === mi && d.getFullYear() === year
+      })
+      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0)
+      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0)
+      return { label, saldo: inc - exp, hasData: txs.length > 0 }
+    })
+
+    const anualInc = transactions.filter(t => t.type === 'income' && new Date(t.date + 'T12:00:00').getFullYear() === year).reduce((s, t) => s + t.value, 0)
+    const anualExp = transactions.filter(t => t.type === 'expense' && new Date(t.date + 'T12:00:00').getFullYear() === year).reduce((s, t) => s + t.value, 0)
+
+    const result = months
+      .filter(m => m.hasData)
+      .map(m => ({
+        text: `${m.label}: ${m.saldo >= 0 ? '+' : ''}${R$(m.saldo)}`,
+        color: m.saldo >= 0 ? '#4ade80' : '#f87171',
+        icon: m.saldo >= 0 ? '🟢' : '🔴',
+      }))
+
+    result.push({
+      text: `${year} (anual): ${anualInc - anualExp >= 0 ? '+' : ''}${R$(anualInc - anualExp)}`,
+      color: anualInc - anualExp >= 0 ? '#4ade80' : '#f87171',
+      icon: anualInc - anualExp >= 0 ? '✅' : '⚠️',
+    })
+
+    return result
+  }, [transactions, year])
+
+  if (items.length <= 1) return null
+
+  const tickerText = items.map(i => `${i.icon} ${i.text}`).join('   •   ')
+  const full = tickerText + '   •   ' + tickerText // duplicate for seamless loop
+
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.35)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+      overflow: 'hidden',
+      padding: '6px 0',
+      position: 'relative',
+    }}>
+      <style>{`
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .health-ticker-inner {
+          display: inline-block;
+          white-space: nowrap;
+          animation: ticker ${Math.max(18, items.length * 4)}s linear infinite;
+        }
+      `}</style>
+      <div className="health-ticker-inner" style={{ fontSize: 12, color: '#cbd5e1', paddingLeft: 16 }}>
+        {items.map((item, i) => (
+          <span key={i}>
+            <span style={{ color: item.color, fontWeight: 600 }}>{item.icon} {item.text}</span>
+            {i < items.length - 1 && <span style={{ color: '#475569', margin: '0 12px' }}>•</span>}
+          </span>
+        ))}
+        <span style={{ color: '#475569', margin: '0 12px' }}>•</span>
+        {items.map((item, i) => (
+          <span key={`dup-${i}`}>
+            <span style={{ color: item.color, fontWeight: 600 }}>{item.icon} {item.text}</span>
+            {i < items.length - 1 && <span style={{ color: '#475569', margin: '0 12px' }}>•</span>}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardScreen() {
   const { state, dispatch } = useApp()
   const { transactions, selM, selY, goals, profile } = state
@@ -108,6 +187,9 @@ export default function DashboardScreen() {
           )}
         </div>
       </div>
+
+      {/* Faixa de Saúde Financeira */}
+      <HealthTicker transactions={transactions} />
 
       <div style={{ padding: '0 16px' }}>
         {/* Alertas */}
