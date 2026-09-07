@@ -675,7 +675,7 @@ function ContasTab({ transactions }) {
 
 // ─── MINHA CONTA ──────────────────────────────────────────
 function MinhaContaTab() {
-  const { state, logout, updateIncome, updatePwd, addToast } = useApp()
+  const { state, dispatch, logout, updateIncome, updatePwd, addToast } = useApp()
   const { profile, user } = state
   const [name, setName] = useState(profile?.name || '')
   const [income, setIncome] = useState(profile?.income || 3000)
@@ -687,7 +687,9 @@ function MinhaContaTab() {
   const savePerfil = async () => {
     setSaving(true)
     try {
-      await profileAPI.update(user.id, { name, income: parseFloat(income) || 0, members })
+      const updated = { ...profile, name, income: parseFloat(income) || 0, members }
+      await profileAPI.update(user.id, updated)
+      dispatch({ type: 'SET_PROFILE', profile: updated })
       addToast('Perfil salvo!')
     } catch { addToast('Erro ao salvar', 'error') }
     setSaving(false)
