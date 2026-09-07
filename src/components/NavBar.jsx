@@ -5,7 +5,7 @@ const NAV = [
   { id: 'txs', icon: '💳', label: 'Transações' },
   { id: '__fab__', icon: '+', label: '' },
   { id: 'planejamento', icon: '🎯', label: 'Planejar' },
-  { id: 'mais', icon: '···', label: 'Mais' },
+  { id: 'negocio', icon: '💼', label: 'Negócio' },
 ]
 
 export default function NavBar() {

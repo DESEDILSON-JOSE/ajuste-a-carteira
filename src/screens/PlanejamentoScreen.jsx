@@ -17,7 +17,7 @@ function Speedometer({ score }) {
   const nx = cx + r * Math.cos(angle)
   const ny = cy - r * Math.sin(angle)
   const color = score < 400 ? '#ef4444' : score < 700 ? '#f59e0b' : '#22c55e'
-  const largeArc = score > 500 ? 1 : 0
+  const largeArc = 0
 
   return (
     <svg viewBox="0 0 200 110" style={{ width: '100%', maxWidth: 240, display: 'block', margin: '0 auto' }}>
@@ -27,8 +27,8 @@ function Speedometer({ score }) {
           stroke={color} strokeWidth={16} fill="none" strokeLinecap="round" />
       )}
       <line x1={cx} y1={cy} x2={nx.toFixed(1)} y2={ny.toFixed(1)} stroke="#1e293b" strokeWidth={3} strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={5} fill="#1e293b" />
-      <text x={cx} y={cy - 10} textAnchor="middle" fontSize={28} fontWeight="700" fill="#1e293b">{score}</text>
+      <circle cx={cx} cy={cy} r={5} fill="#94a3b8" />
+      <text x={cx} y={cy - 10} textAnchor="middle" fontSize={28} fontWeight="700" fill="#f1f5f9">{score}</text>
       <text x={cx} y={cy + 6} textAnchor="middle" fontSize={10} fill="#64748b">SCORE</text>
     </svg>
   )
