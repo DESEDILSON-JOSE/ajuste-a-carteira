@@ -14,7 +14,7 @@ import NavBar from './components/NavBar'
 import AddTransactionModal from './components/modals/AddTransactionModal'
 import EditGoalModal from './components/modals/EditGoalModal'
 
-const ADMIN_EMAIL = 'desedilson@hotmail.com'
+const ADMIN_EMAIL = 'desedilson@gmail.com'
 
 export default function App() {
   const { state } = useContext(AppContext)
@@ -26,11 +26,12 @@ export default function App() {
 
   if (authLoading) return <LoadingScreen />
   if (!user) return <LoginScreen />
-  if (!profile) return <LoadingScreen />
-
   const isAdmin = user.email === ADMIN_EMAIL
 
-  if (!isAdmin && profile.status !== 'approved') {
+  // Admin bypasses profile requirement
+  if (!profile && !isAdmin) return <LoadingScreen />
+
+  if (!isAdmin && profile?.status !== 'approved') {
     return <WaitingApprovalScreen rejected={profile.status === 'rejected'} />
   }
 

@@ -36,7 +36,7 @@ export default function WaitingApprovalScreen({ rejected = false }) {
         }}>
           <p style={{ color: '#64748b', fontSize: 13, margin: 0, lineHeight: 1.6 }}>
             📧 Contato do administrador:<br />
-            <span style={{ color: '#60a5fa', fontWeight: 600 }}>desedilson@hotmail.com</span>
+            <span style={{ color: '#60a5fa', fontWeight: 600 }}>desedilson@gmail.com</span>
           </p>
         </div>
 

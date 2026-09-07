@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext'
 
-const ADMIN_EMAIL = 'desedilson@hotmail.com'
+const ADMIN_EMAIL = 'desedilson@gmail.com'
 
 const NAV_DEFAULT = [
   { id: 'dashboard', icon: '🏠', label: 'Principal' },
