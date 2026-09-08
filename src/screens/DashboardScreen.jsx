@@ -95,6 +95,8 @@ export default function DashboardScreen() {
   const { transactions, selM, selY, goals, profile } = state
   const today = todayStr()
 
+  const { budgets } = state
+
   const { monthTxs, totalIncome, totalExpense, balance, prevBalance, byCategory, overdue, dueToday, last8 } = useMemo(() => {
     const monthTxs = transactions.filter(t => {
       const d = new Date(t.date + 'T12:00:00')
@@ -140,6 +142,14 @@ export default function DashboardScreen() {
 
   const income = profile?.income || 3000
   const savingRate = income > 0 ? ((totalIncome - totalExpense) / income * 100).toFixed(1) : 0
+
+  const budgetAlerts = useMemo(() => {
+    return budgets.map(b => {
+      const actual = byCategory[b.category] || 0
+      const ratio = b.amount > 0 ? actual / b.amount : 0
+      return { ...b, actual, ratio }
+    }).filter(b => b.ratio >= 0.7).sort((a, b) => b.ratio - a.ratio)
+  }, [budgets, byCategory])
 
   const tips = []
   if (goals.length > 0) {
@@ -212,6 +222,31 @@ export default function DashboardScreen() {
                 <span style={{ color: '#b45309', fontWeight: 600 }}>{R$(t.value)}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Alertas de Orçamento */}
+        {budgetAlerts.length > 0 && (
+          <div className="card" style={{ borderColor: budgetAlerts[0].ratio >= 1 ? '#ef4444' : '#f59e0b', borderWidth: 1 }}>
+            <div className="card-title" style={{ color: budgetAlerts[0].ratio >= 1 ? '#dc2626' : '#b45309' }}>
+              📋 Planejamento por categoria
+            </div>
+            {budgetAlerts.map(b => {
+              const over = b.ratio >= 1
+              const pctVal = Math.min(100, b.ratio * 100)
+              const color = over ? '#ef4444' : '#f59e0b'
+              return (
+                <div key={b.id} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
+                    <span>{over ? '🔴' : '⚠️'} {b.category}</span>
+                    <span style={{ color, fontWeight: 600 }}>{R$(b.actual)} / {R$(b.amount)}</span>
+                  </div>
+                  <div className="prog">
+                    <div className="prog-fill" style={{ width: `${pctVal}%`, background: color }} />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
 

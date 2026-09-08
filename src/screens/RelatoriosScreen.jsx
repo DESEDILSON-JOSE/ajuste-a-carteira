@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { useApp } from '../context/AppContext'
-import { R$, pct, CAT_COLOR, CAT_ICON, MONTHS, fmtDate, ACCOUNTS, ACCOUNT_ICON } from '../utils/formatters'
+import { R$, pct, CAT_COLOR, CAT_ICON, CATS_EXPENSE, MONTHS, fmtDate, ACCOUNTS, ACCOUNT_ICON } from '../utils/formatters'
 import { profileAPI } from '../utils/api'
 
 // ─── 7 DIAS ────────────────────────────────────────────────
@@ -449,6 +449,102 @@ function GastosFixosTab() {
 }
 
 // ─── COMPROMETIMENTO ORÇAMENTÁRIO ─────────────────────────────
+// ─── PLANEJAMENTO POR CATEGORIA ────────────────────────────
+function BudgetSection({ transactions }) {
+  const { state, saveBudget, deleteBudget } = useApp()
+  const { budgets, selM, selY } = state
+  const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState({ category: CATS_EXPENSE[0], amount: '' })
+
+  const actualByCategory = React.useMemo(() => {
+    const acc = {}
+    transactions.filter(t => {
+      const d = new Date(t.date + 'T12:00:00')
+      return t.type === 'expense' && d.getMonth() + 1 === selM && d.getFullYear() === selY
+    }).forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.value })
+    return acc
+  }, [transactions, selM, selY])
+
+  const openAdd = () => { setEditId(null); setForm({ category: CATS_EXPENSE[0], amount: '' }); setShowForm(true) }
+  const openEdit = (b) => { setEditId(b.id); setForm({ category: b.category, amount: String(b.amount) }); setShowForm(true) }
+  const cancel = () => { setShowForm(false); setEditId(null) }
+
+  const handleSave = async () => {
+    const amt = parseFloat(form.amount)
+    if (!amt || isNaN(amt) || amt <= 0) return
+    await saveBudget(editId || null, form.category, amt)
+    cancel()
+  }
+
+  const inp = { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 14, width: '100%', boxSizing: 'border-box' }
+
+  const MONTHS_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div className="card-title" style={{ margin: 0 }}>📋 Planejamento — {MONTHS_LABEL[selM - 1]}/{selY}</div>
+        {!showForm && (
+          <button onClick={openAdd} style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid #22c55e', color: '#4ade80', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>+ Novo</button>
+        )}
+      </div>
+
+      {showForm && (
+        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Categoria</label>
+            <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={inp}>
+              {CATS_EXPENSE.map(c => <option key={c} value={c}>{CAT_ICON[c] || '📌'} {c}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Valor planejado por mês (R$)</label>
+            <input type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0,00" style={inp} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleSave} style={{ flex: 1, background: '#22c55e', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, padding: '8px 0', cursor: 'pointer', fontSize: 14 }}>Salvar</button>
+            <button onClick={cancel} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: '#cbd5e1', fontWeight: 700, padding: '8px 0', cursor: 'pointer', fontSize: 14 }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {budgets.length === 0 && !showForm ? (
+        <div style={{ fontSize: 13, color: '#64748b', textAlign: 'center', padding: '16px 0' }}>
+          Nenhum planejamento cadastrado.<br />Clique em "+ Novo" para definir um limite por categoria.
+        </div>
+      ) : (
+        budgets.map(b => {
+          const actual = actualByCategory[b.category] || 0
+          const ratio = b.amount > 0 ? actual / b.amount : 0
+          const pctVal = ratio * 100
+          const color = ratio >= 1 ? '#ef4444' : ratio >= 0.7 ? '#f59e0b' : '#22c55e'
+          const status = ratio >= 1 ? '🔴 Estourado!' : ratio >= 0.7 ? '⚠️ Atenção' : '✅ Ok'
+          return (
+            <div key={b.id} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{CAT_ICON[b.category] || '📌'} {b.category}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color, fontWeight: 700 }}>{R$(actual)} / {R$(b.amount)}</span>
+                  <button onClick={() => openEdit(b)} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px' }}>✏️</button>
+                  <button onClick={() => deleteBudget(b.id)} title="Remover" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px' }}>🗑️</button>
+                </div>
+              </div>
+              <div className="prog">
+                <div className="prog-fill" style={{ width: `${Math.min(100, pctVal)}%`, background: color, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                <span>{pctVal.toFixed(0)}% utilizado</span>
+                <span style={{ color }}>{status}</span>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
 function OrcamentoTab({ transactions }) {
   const { state } = useApp()
   const income = (state.profile?.income || 0) + (parseFloat(localStorage.getItem('businessMonthlyIncome') || '0'))
@@ -574,23 +670,8 @@ function OrcamentoTab({ transactions }) {
         </div>
       </div>
 
-      {/* Fixos por categoria */}
-      {fixos.length > 0 && (
-        <div className="card">
-          <div className="card-title">🏷️ Fixos por Categoria</div>
-          {Object.entries(fixos.reduce((acc, f) => { acc[f.category] = (acc[f.category] || 0) + f.value; return acc }, {}))
-            .sort((a, b) => b[1] - a[1])
-            .map(([cat, val]) => (
-              <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ fontSize: 14 }}>{FIXOS_ICONS[cat] || '📌'} {cat}</span>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(val)}/mês</div>
-                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{R$(val * 12)}/ano</div>
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
+      {/* Planejamento por Categoria */}
+      <BudgetSection transactions={transactions} />
     </div>
   )
 }

@@ -126,6 +126,21 @@ export const vplAPI = {
     handle(supabase.from('vpl_projects').delete().eq('id', id)),
 }
 
+export const budgetsAPI = {
+  getAll: async (userId) =>
+    handle(supabase.from('budgets').select('*').eq('user_id', userId).order('category')),
+  upsert: async (budget) => {
+    const { data, error } = await supabase.from('budgets').upsert(
+      { ...budget, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,category' }
+    ).select().single()
+    if (error) throw error
+    return data
+  },
+  delete: async (id) =>
+    handle(supabase.from('budgets').delete().eq('id', id)),
+}
+
 export const adminAPI = {
   getAllProfiles: async () => {
     const { data, error } = await supabase

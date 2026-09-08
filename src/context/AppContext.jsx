@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
-import { authAPI, profileAPI, txAPI, goalsAPI, lotsAPI, vplAPI } from '../utils/api'
+import { authAPI, profileAPI, txAPI, goalsAPI, lotsAPI, vplAPI, budgetsAPI } from '../utils/api'
 import { SEED_GOALS_TEMPLATE } from '../utils/seedData'
 import { translateError, todayStr } from '../utils/formatters'
 
@@ -21,6 +21,7 @@ const initialState = {
   goals: [],
   lots: [],
   vplProjects: [],
+  budgets: [],
   toasts: [],
   offline: false,
 }
@@ -78,6 +79,7 @@ function reducer(state, action) {
     case 'ADD_TOAST': return { ...state, toasts: [...state.toasts, action.toast] }
     case 'DEL_TOAST': return { ...state, toasts: state.toasts.filter(t => t.id !== action.id) }
     case 'SET_OFFLINE': return { ...state, offline: action.offline }
+    case 'SET_BUDGETS': return { ...state, budgets: action.budgets }
     default: return state
   }
 }
@@ -93,12 +95,13 @@ export function AppProvider({ children }) {
 
   const loadUserData = useCallback(async (userId) => {
     try {
-      const [profileRes, txs, goals, lots, vpls] = await Promise.all([
+      const [profileRes, txs, goals, lots, vpls, budgets] = await Promise.all([
         profileAPI.get(userId),
         txAPI.getAll(userId),
         goalsAPI.getAll(userId),
         lotsAPI.getAll(userId),
         vplAPI.getAll(userId),
+        budgetsAPI.getAll(userId),
       ])
       let profileData = profileRes.data
       if (!profileData) {
@@ -118,6 +121,7 @@ export function AppProvider({ children }) {
       dispatch({ type: 'SET_GOALS', goals: finalGoals })
       dispatch({ type: 'SET_LOTS', lots: lots || [] })
       dispatch({ type: 'SET_VPL', projects: vpls || [] })
+      dispatch({ type: 'SET_BUDGETS', budgets: budgets || [] })
     } catch (err) {
       console.error('loadUserData error:', err)
     }
@@ -247,6 +251,28 @@ export function AppProvider({ children }) {
     } catch (err) { addToast('Erro ao atualizar fixo', 'error') }
   }
 
+  const saveBudget = async (id, category, amount) => {
+    try {
+      const saved = await budgetsAPI.upsert({
+        ...(id ? { id } : {}),
+        user_id: state.user.id, category, amount,
+      })
+      dispatch({
+        type: 'SET_BUDGETS',
+        budgets: state.budgets.some(b => b.id === saved.id)
+          ? state.budgets.map(b => b.id === saved.id ? saved : b)
+          : [...state.budgets, saved],
+      })
+      addToast('Planejamento salvo!')
+    } catch (err) { addToast(err.message, 'error') }
+  }
+
+  const deleteBudget = async (id) => {
+    dispatch({ type: 'SET_BUDGETS', budgets: state.budgets.filter(b => b.id !== id) })
+    try { await budgetsAPI.delete(id) }
+    catch (err) { addToast('Erro ao excluir planejamento', 'error') }
+  }
+
   const updateGoal = async (goal) => {
     try {
       const saved = await goalsAPI.upsert({ ...goal, user_id: state.user.id })
@@ -369,6 +395,7 @@ export function AppProvider({ children }) {
     state, dispatch, addToast,
     login, signup, logout, resetPwd, updatePwd,
     addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup, updateFixo,
+    saveBudget, deleteBudget,
     updateGoal, deleteGoal,
     addLot, updateLot,
     addLotItem, updateLotItem, deleteItem,
