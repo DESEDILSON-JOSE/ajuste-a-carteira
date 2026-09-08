@@ -7,7 +7,28 @@ import { dreAPI, vplAPI } from '../utils/api'
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, updateWorker, deleteWorker, updateWorkerItem } = useApp()
+  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, updateWorker, deleteWorker, updateWorkerItem, addTx, addToast } = useApp()
+
+  const addFamilyIncomeTx = async (workerName, earned) => {
+    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date: todayStr(), account: 'Pix', paid: true })
+  }
+
+  const addFamilyIncomeAnual = async (workerName, earned) => {
+    const year = new Date().getFullYear()
+    const rid = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    let ok = 0
+    for (let m = 0; m < 12; m++) {
+      const day = Math.min(28, daysInMonth[m])
+      const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      try {
+        await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date, account: 'Pix', paid: false, recurring: true, recurring_id: rid })
+        ok++
+      } catch (_) {}
+    }
+    if (ok === 12) addToast(`12 lançamentos criados para ${workerName}!`)
+    else addToast(`${ok}/12 lançamentos criados`, 'error')
+  }
   const [newWorkerName, setNewWorkerName] = useState('')
 
   const items = lot.lot_items || []
@@ -196,6 +217,14 @@ function FaccoesTab({ lot, lotIdx }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{w.name}</div>
                 {isUnderMin && <span style={{ fontSize: 11, background: '#fef2f2', color: '#dc2626', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>⚠ Abaixo do mínimo</span>}
+                <button
+                  onClick={() => updateWorker(lotIdx, wi, w.id, { is_family_income: !w.is_family_income })}
+                  title={w.is_family_income ? 'Remover da receita familiar' : 'Marcar como receita da família'}
+                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 600,
+                    background: w.is_family_income ? '#dcfce7' : '#f1f5f9',
+                    color: w.is_family_income ? '#16a34a' : '#64748b' }}>
+                  {w.is_family_income ? '👨‍👩‍👧 Família ✓' : '👤 Família?'}
+                </button>
               </div>
               <button onClick={() => deleteWorker(lotIdx, w.id)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}
@@ -256,6 +285,27 @@ function FaccoesTab({ lot, lotIdx }) {
                 </div>
               </div>
             </div>
+            {/* Painel de receita familiar */}
+            {w.is_family_income && (
+              <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
+                  👨‍👩‍👧 Receita da família — {R$(earned)} este lote
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-sm" style={{ background: '#15803d', color: '#fff', fontSize: 12 }}
+                    onClick={() => addFamilyIncomeTx(w.name, earned)}>
+                    📥 Lançar renda do mês
+                  </button>
+                  <button className="btn btn-sm" style={{ background: '#1d4ed8', color: '#fff', fontSize: 12 }}
+                    onClick={() => addFamilyIncomeAnual(w.name, earned)}>
+                    📅 Projetar anual (12×)
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                  "Lançar renda do mês" registra {R$(earned)} como receita hoje. "Projetar anual" cria 12 lançamentos mensais de {R$(earned)} para {new Date().getFullYear()}.
+                </div>
+              </div>
+            )}
           </div>
         ))}
         <div style={{ display: 'flex', gap: 8 }}>
