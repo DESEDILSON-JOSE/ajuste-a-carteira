@@ -8,6 +8,7 @@ import TransacoesScreen from './screens/TransacoesScreen'
 import PlanejamentoScreen from './screens/PlanejamentoScreen'
 import NegocioScreen from './screens/NegocioScreen'
 import RelatoriosScreen from './screens/RelatoriosScreen'
+import GastosScreen from './screens/GastosScreen'
 import AdminScreen from './screens/AdminScreen'
 import WaitingApprovalScreen from './screens/WaitingApprovalScreen'
 import NavBar from './components/NavBar'
@@ -45,6 +46,7 @@ export default function App() {
         {activeTab === 'planejamento' && <PlanejamentoScreen />}
         {activeTab === 'negocio'      && <NegocioScreen />}
         {activeTab === 'mais'         && <RelatoriosScreen />}
+        {activeTab === 'gastos'       && <GastosScreen />}
         {activeTab === 'admin'        && isAdmin && <AdminScreen />}
       </div>
       <NavBar />

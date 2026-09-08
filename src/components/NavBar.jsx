@@ -20,12 +20,14 @@ export default function NavBar() {
   const maisOptions = isAdmin
     ? [
         { id: 'admin',    icon: '🛡️', label: 'Admin' },
+        { id: 'gastos',   icon: '📊', label: 'Rastreio' },
         { id: 'negocio',  icon: '💼', label: 'Negócio' },
-        { id: 'mais',     icon: '📊', label: 'Relatórios' },
+        { id: 'mais',     icon: '📈', label: 'Relatórios' },
       ]
     : [
+        { id: 'gastos',   icon: '📊', label: 'Rastreio' },
         { id: 'negocio',  icon: '💼', label: 'Negócio' },
-        { id: 'mais',     icon: '📊', label: 'Relatórios' },
+        { id: 'mais',     icon: '📈', label: 'Relatórios' },
       ]
 
   const maisActiveIds = maisOptions.map(o => o.id)
