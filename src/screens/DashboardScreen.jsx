@@ -91,7 +91,7 @@ function HealthTicker({ transactions }) {
 }
 
 export default function DashboardScreen() {
-  const { state, dispatch } = useApp()
+  const { state, dispatch, updateTx } = useApp()
   const { transactions, selM, selY, goals, profile } = state
   const today = todayStr()
 
@@ -205,9 +205,12 @@ export default function DashboardScreen() {
           <div className="card" style={{ borderColor: '#ef4444', borderWidth: 1 }}>
             <div className="card-title" style={{ color: '#dc2626' }}>⚠️ Despesas atrasadas ({overdue.length})</div>
             {overdue.slice(0, 3).map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 6 }}>
                 <span>{t.description}</span>
-                <span style={{ color: '#dc2626', fontWeight: 600 }}>{R$(t.value)}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#dc2626', fontWeight: 600 }}>{R$(t.value)}</span>
+                  <button onClick={() => updateTx(t.id, { paid: true })} style={{ background: '#dc2626', border: 'none', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>✓ Pagar</button>
+                </div>
               </div>
             ))}
           </div>
@@ -217,9 +220,12 @@ export default function DashboardScreen() {
           <div className="card" style={{ borderColor: '#f59e0b', borderWidth: 1 }}>
             <div className="card-title" style={{ color: '#b45309' }}>📅 Vence hoje ({dueToday.length})</div>
             {dueToday.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 6 }}>
                 <span>{t.description}</span>
-                <span style={{ color: '#b45309', fontWeight: 600 }}>{R$(t.value)}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#b45309', fontWeight: 600 }}>{R$(t.value)}</span>
+                  <button onClick={() => updateTx(t.id, { paid: true })} style={{ background: '#b45309', border: 'none', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>✓ Pagar</button>
+                </div>
               </div>
             ))}
           </div>
@@ -311,7 +317,11 @@ export default function DashboardScreen() {
                   <div className={`tx-value ${t.type === 'income' ? 'income' : 'expense'}`}>
                     {t.type === 'income' ? '+' : '-'}{R$(t.value)}
                   </div>
-                  {t.type === 'expense' && !t.paid && <span className="badge badge-orange">pendente</span>}
+                  {t.type === 'expense' && !t.paid && (
+            <button onClick={() => updateTx(t.id, { paid: true })} style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#fbbf24', borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '3px 8px', cursor: 'pointer', marginTop: 2 }}>
+              pendente · ✓ Pagar
+            </button>
+          )}
                 </div>
               </div>
             ))}
