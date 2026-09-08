@@ -282,34 +282,43 @@ function AnualTab({ transactions }) {
 const FIXOS_CATS = ['Habitação','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Outros']
 const FIXOS_ICONS = {'Habitação':'🏠','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Outros':'📌'}
 
-function loadFixos() {
-  try { return JSON.parse(localStorage.getItem('gastosFixos') || '[]') } catch { return [] }
-}
-function saveFixos(items) { localStorage.setItem('gastosFixos', JSON.stringify(items)) }
-
 function GastosFixosTab() {
-  const [fixos, setFixos] = React.useState(loadFixos)
-  const [form, setForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5, active: true })
-  const [editId, setEditId] = React.useState(null)
+  const { state, addFixo, deleteRecurringGroup } = useApp()
+  const [form, setForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5 })
   const [showForm, setShowForm] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
 
-  const persist = (items) => { setFixos(items); saveFixos(items) }
+  // Deriva fixos únicos agrupando por recurring_id
+  const fixos = React.useMemo(() => {
+    const groups = {}
+    state.transactions.filter(t => t.recurring && t.type === 'expense').forEach(t => {
+      if (!groups[t.recurring_id]) {
+        const d = new Date(t.date + 'T12:00:00')
+        groups[t.recurring_id] = {
+          recurring_id: t.recurring_id,
+          description: t.description,
+          value: t.value,
+          category: t.category,
+          dueDay: d.getDate(),
+        }
+      }
+    })
+    return Object.values(groups)
+  }, [state.transactions])
 
-  const handleSave = () => {
+  const total = fixos.reduce((s, f) => s + f.value, 0)
+  const totalAnual = total * 12
+
+  const handleSave = async () => {
     if (!form.description || !form.value) return
-    const item = { ...form, value: parseFloat(form.value), id: editId || Date.now() }
-    persist(editId ? fixos.map(f => f.id === editId ? item : f) : [...fixos, item])
-    setForm({ description: '', value: '', category: 'Habitação', dueDay: 5, active: true })
-    setEditId(null); setShowForm(false)
+    setSaving(true)
+    await addFixo({ ...form, value: parseFloat(form.value) })
+    setSaving(false)
+    setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 })
+    setShowForm(false)
   }
 
-  const startEdit = (f) => { setForm({ ...f, value: String(f.value) }); setEditId(f.id); setShowForm(true) }
-  const remove = (id) => { if (window.confirm('Excluir este gasto fixo?')) persist(fixos.filter(f => f.id !== id)) }
-  const toggle = (id) => persist(fixos.map(f => f.id === id ? { ...f, active: !f.active } : f))
-
-  const ativos = fixos.filter(f => f.active)
-  const total = ativos.reduce((s, f) => s + f.value, 0)
-  const totalAnual = total * 12
+  const remove = (rid) => deleteRecurringGroup(rid)
 
   return (
     <div>
@@ -329,16 +338,14 @@ function GastosFixosTab() {
       {fixos.length > 0 && (
         <div className="card">
           {fixos.map(f => (
-            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <div key={f.recurring_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: f.active ? 'var(--text)' : 'var(--cinza)', textDecoration: f.active ? 'none' : 'line-through' }}>{f.description}</div>
-                <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · vence dia {f.dueDay}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
+                <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · vence dia {f.dueDay} · todos os meses</div>
               </div>
-              <span style={{ fontWeight: 700, color: f.active ? '#f87171' : 'var(--cinza)', fontSize: 14 }}>{R$(f.value)}</span>
-              <button onClick={() => toggle(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}>{f.active ? '✅' : '⭕'}</button>
-              <button onClick={() => startEdit(f)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', fontSize: 14 }}>✏️</button>
-              <button onClick={() => remove(f.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14 }}>🗑</button>
+              <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(f.value)}</span>
+              <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}>🗑</button>
             </div>
           ))}
         </div>
@@ -347,7 +354,7 @@ function GastosFixosTab() {
       {/* Form */}
       {showForm ? (
         <div className="card">
-          <div className="card-title">{editId ? 'Editar' : 'Novo'} Gasto Fixo</div>
+          <div className="card-title">Novo Gasto Fixo</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
               <label className="label">Descrição</label>
@@ -369,9 +376,12 @@ function GastosFixosTab() {
                 {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
+            <div style={{ fontSize: 12, color: '#60a5fa', padding: '4px 0' }}>
+              📅 Serão criadas despesas para todos os 12 meses do ano automaticamente.
+            </div>
             <div className="g2">
-              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setEditId(null); setForm({ description: '', value: '', category: 'Habitação', dueDay: 5, active: true }) }}>Cancelar</button>
-              <button className="btn btn-dark btn-full" onClick={handleSave}>Salvar</button>
+              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 }) }}>Cancelar</button>
+              <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
         </div>
@@ -383,6 +393,7 @@ function GastosFixosTab() {
         <div style={{ textAlign: 'center', padding: 32, color: 'var(--cinza)' }}>
           <div style={{ fontSize: 40 }}>🏷️</div>
           <div style={{ marginTop: 8 }}>Nenhum gasto fixo cadastrado</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Gastos fixos aparecem automaticamente em todos os meses</div>
         </div>
       )}
     </div>
@@ -394,8 +405,15 @@ function OrcamentoTab({ transactions }) {
   const { state } = useApp()
   const income = (state.profile?.income || 0) + (parseFloat(localStorage.getItem('businessMonthlyIncome') || '0'))
   const incomeAnual = income * 12
-  const fixos = loadFixos().filter(f => f.active)
-  const totalFixos = fixos.reduce((s, f) => s + f.value, 0)
+  // Fixos agora vêm das transações recorrentes do Supabase
+  const fixosUnicos = React.useMemo(() => {
+    const groups = {}
+    state.transactions.filter(t => t.recurring && t.type === 'expense').forEach(t => {
+      if (!groups[t.recurring_id]) groups[t.recurring_id] = t.value
+    })
+    return Object.values(groups)
+  }, [state.transactions])
+  const totalFixos = fixosUnicos.reduce((s, v) => s + v, 0)
   const totalFixosAnual = totalFixos * 12
 
   const selY = new Date().getFullYear()

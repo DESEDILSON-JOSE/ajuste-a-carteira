@@ -40,6 +40,8 @@ export const txAPI = {
     handle(supabase.from('transactions').update(data).eq('id', id)),
   delete: async (id) =>
     handle(supabase.from('transactions').delete().eq('id', id)),
+  deleteByRecurringId: async (recurringId, userId) =>
+    handle(supabase.from('transactions').delete().eq('recurring_id', recurringId).eq('user_id', userId)),
 }
 
 export const goalsAPI = {
