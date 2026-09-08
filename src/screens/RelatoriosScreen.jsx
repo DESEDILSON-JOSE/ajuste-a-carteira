@@ -283,9 +283,11 @@ const FIXOS_CATS = ['Habitação','Utilities','Saúde','Transporte','Educação'
 const FIXOS_ICONS = {'Habitação':'🏠','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Outros':'📌'}
 
 function GastosFixosTab() {
-  const { state, addFixo, deleteRecurringGroup } = useApp()
+  const { state, addFixo, deleteRecurringGroup, updateFixo } = useApp()
   const [form, setForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5 })
   const [showForm, setShowForm] = React.useState(false)
+  const [editingFixo, setEditingFixo] = React.useState(null) // { recurring_id, ... }
+  const [editForm, setEditForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5 })
   const [saving, setSaving] = React.useState(false)
 
   // Deriva fixos únicos agrupando por recurring_id
@@ -318,6 +320,19 @@ function GastosFixosTab() {
     setShowForm(false)
   }
 
+  const startEdit = (f) => {
+    setEditingFixo(f)
+    setEditForm({ description: f.description, value: String(f.value), category: f.category, dueDay: f.dueDay })
+  }
+
+  const handleUpdate = async () => {
+    if (!editForm.value) return
+    setSaving(true)
+    await updateFixo(editingFixo.recurring_id, { ...editForm, value: parseFloat(editForm.value) })
+    setSaving(false)
+    setEditingFixo(null)
+  }
+
   const remove = (rid) => deleteRecurringGroup(rid)
 
   return (
@@ -338,20 +353,53 @@ function GastosFixosTab() {
       {fixos.length > 0 && (
         <div className="card">
           {fixos.map(f => (
-            <div key={f.recurring_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
-                <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · vence dia {f.dueDay} · todos os meses</div>
+            <div key={f.recurring_id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: editingFixo?.recurring_id === f.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · dia {f.dueDay} · todos os meses</div>
+                </div>
+                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(f.value)}</span>
+                <button onClick={() => editingFixo?.recurring_id === f.recurring_id ? setEditingFixo(null) : startEdit(f)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
+                <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}>🗑</button>
               </div>
-              <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(f.value)}</span>
-              <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}>🗑</button>
+              {/* Form de edição inline */}
+              {editingFixo?.recurring_id === f.recurring_id && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 11, color: '#60a5fa', marginBottom: 2 }}>✏️ Atualiza apenas meses a partir de hoje</div>
+                  <div>
+                    <label className="label">Descrição</label>
+                    <input className="input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+                  </div>
+                  <div className="g2">
+                    <div>
+                      <label className="label">Novo valor (R$)</label>
+                      <input className="input" type="number" inputMode="decimal" value={editForm.value} onChange={e => setEditForm(f => ({ ...f, value: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="label">Vence dia</label>
+                      <input className="input" type="number" min="1" max="31" value={editForm.dueDay} onChange={e => setEditForm(f => ({ ...f, dueDay: parseInt(e.target.value) || 1 }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Categoria</label>
+                    <select className="input" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
+                      {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="g2">
+                    <button className="btn btn-ghost btn-full" onClick={() => setEditingFixo(null)}>Cancelar</button>
+                    <button className="btn btn-dark btn-full" onClick={handleUpdate} disabled={saving}>{saving ? 'Salvando...' : 'Atualizar'}</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Form */}
+      {/* Form novo */}
       {showForm ? (
         <div className="card">
           <div className="card-title">Novo Gasto Fixo</div>

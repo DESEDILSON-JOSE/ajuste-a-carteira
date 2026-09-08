@@ -222,6 +222,31 @@ export function AppProvider({ children }) {
     } catch (err) { addToast('Erro ao remover fixo', 'error') }
   }
 
+  const updateFixo = async (recurringId, newData) => {
+    const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
+    const toUpdate = state.transactions.filter(t => t.recurring_id === recurringId && t.date >= startOfMonth)
+    const updated = state.transactions.map(t => {
+      if (t.recurring_id !== recurringId || t.date < startOfMonth) return t
+      const d = new Date(t.date + 'T12:00:00')
+      const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+      const day = Math.min(newData.dueDay || d.getDate(), daysInMonth)
+      const newDate = `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      return { ...t, value: newData.value, description: newData.description, category: newData.category, date: newDate }
+    })
+    dispatch({ type: 'SET_TXS', transactions: updated })
+    try {
+      await Promise.all(toUpdate.map(t => {
+        const d = new Date(t.date + 'T12:00:00')
+        const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+        const day = Math.min(newData.dueDay || d.getDate(), daysInMonth)
+        const newDate = `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        return txAPI.update(t.id, { value: newData.value, description: newData.description, category: newData.category, date: newDate })
+      }))
+      addToast('Gasto fixo atualizado (meses futuros)!')
+    } catch (err) { addToast('Erro ao atualizar fixo', 'error') }
+  }
+
   const updateGoal = async (goal) => {
     try {
       const saved = await goalsAPI.upsert({ ...goal, user_id: state.user.id })
@@ -343,7 +368,7 @@ export function AppProvider({ children }) {
   const value = {
     state, dispatch, addToast,
     login, signup, logout, resetPwd, updatePwd,
-    addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup,
+    addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup, updateFixo,
     updateGoal, deleteGoal,
     addLot, updateLot,
     addLotItem, updateLotItem, deleteItem,
