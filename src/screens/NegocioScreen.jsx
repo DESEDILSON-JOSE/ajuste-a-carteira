@@ -7,26 +7,66 @@ import { dreAPI, vplAPI } from '../utils/api'
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, updateWorker, deleteWorker, updateWorkerItem, addToast } = useApp()
+  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, updateWorker, deleteWorker, updateWorkerItem } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
 
   const items = lot.lot_items || []
   const expenses = lot.lot_expenses || []
   const workers = lot.workers || []
 
+  // ── Totais básicos ──────────────────────────────────────────
   const totalProd = items.reduce((s, i) => s + (parseFloat(i.value) || 0) * (parseInt(i.quantity) || 0), 0)
   const totalExp = expenses.reduce((s, e) => s + (parseFloat(e.value) || 0), 0)
-  const liquid = totalProd - totalExp
-
   const totalHoursSecs = items.reduce((s, i) => s + parseTimeSecs(i.time_per_piece) * (parseInt(i.quantity) || 0), 0)
   const totalHours = totalHoursSecs / 3600
   const availableHours = (lot.team_size || 0) * (lot.hours_per_day || 0) * (lot.work_days || 0)
   const usedPct = availableHours > 0 ? (totalHours / availableHours) * 100 : 0
-  const minSalary = 1412
-  const minPeriod = (lot.work_days || 0) / 30 * minSalary
 
   const setLotField = (key, val) => updateLot(lotIdx, { [key]: val })
   const setItemField = (item, key, val) => updateLotItem(lotIdx, item.id, { [key]: val })
+
+  // ── Análise por colaborador ─────────────────────────────────
+  const workerAnalysis = workers.map((w, wi) => {
+    const wi_items = w.worker_items || []
+    // Horas que esse colaborador vai trabalhar (% do tempo de cada peça)
+    const workerHoursSecs = items.reduce((s, item) => {
+      const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
+      const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
+      return s + (p / 100) * itemSecs
+    }, 0)
+    // Ganho total (% do valor do item)
+    const earned = items.reduce((s, item) => {
+      const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
+      const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
+      return s + (p / 100) * itemTotal
+    }, 0)
+    const hoursPerDay = lot.hours_per_day || 8
+    const daysNeeded = hoursPerDay > 0 ? (workerHoursSecs / 3600) / hoursPerDay : 0
+    const dailyEarned = daysNeeded > 0 ? earned / daysNeeded : 0
+    const dailyRate = parseFloat(w.daily_rate) || 0
+    const isUnderMin = dailyRate > 0 && dailyEarned < dailyRate
+    return { worker: w, wi, workerHoursSecs, earned, daysNeeded, dailyEarned, dailyRate, isUnderMin }
+  })
+
+  // Colaborador com menor ganho/dia (referência para análise de prejuízo)
+  const minEarner = workerAnalysis.filter(a => a.dailyEarned > 0)
+    .reduce((min, a) => (!min || a.dailyEarned < min.dailyEarned) ? a : min, null)
+
+  // Prazo: dias que o lote leva (quem demorar mais define o prazo)
+  const maxDays = workerAnalysis.length > 0
+    ? Math.max(...workerAnalysis.map(a => a.daysNeeded))
+    : (lot.hours_per_day || 8) > 0 ? totalHours / (lot.hours_per_day || 8) : 0
+
+  // Data de término baseada na data de início
+  const startDate = lot.start_date ? new Date(lot.start_date + 'T12:00:00') : null
+  const endDate = startDate && maxDays > 0
+    ? new Date(startDate.getTime() + Math.ceil(maxDays) * 24 * 3600 * 1000) : null
+  const fmtD = d => d ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '–'
+
+  // Custo total dos colaboradores e lucro real
+  const totalWorkerCost = workerAnalysis.reduce((s, a) => s + a.earned, 0)
+  const trueProfit = totalProd - totalWorkerCost - totalExp
+  const trueProfitPerDay = maxDays > 0 ? trueProfit / maxDays : 0
 
   return (
     <div>
@@ -34,7 +74,7 @@ function FaccoesTab({ lot, lotIdx }) {
       <div className="card">
         <div className="card-title">📊 Capacidade da Equipe</div>
         <div className="g3" style={{ marginBottom: 12 }}>
-          {[['team_size', 'Funcionários'], ['hours_per_day', 'Horas/dia'], ['work_days', 'Dias']].map(([key, label]) => (
+          {[['team_size', 'Funcionários'], ['hours_per_day', 'Horas/dia'], ['work_days', 'Dias ref.']].map(([key, label]) => (
             <div key={key}>
               <label className="label">{label}</label>
               <input className="input" type="number" inputMode="numeric"
@@ -42,9 +82,15 @@ function FaccoesTab({ lot, lotIdx }) {
             </div>
           ))}
         </div>
+        {/* Data de início */}
+        <div style={{ marginBottom: 10 }}>
+          <label className="label">Data de início do lote</label>
+          <input className="input" type="date" value={lot.start_date || ''}
+            onChange={e => setLotField('start_date', e.target.value)} />
+        </div>
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-            <span>Horas necessárias: <b>{fmtHours(totalHoursSecs)}</b></span>
+            <span>Horas totais do lote: <b>{fmtHours(totalHoursSecs)}</b></span>
             <span style={{ color: usedPct > 100 ? '#ef4444' : usedPct > 90 ? '#f59e0b' : '#22c55e', fontWeight: 700 }}>{usedPct.toFixed(0)}%</span>
           </div>
           <div className="prog">
@@ -57,26 +103,62 @@ function FaccoesTab({ lot, lotIdx }) {
         </div>
       </div>
 
+      {/* Prazo do lote */}
+      {(maxDays > 0 || startDate) && (
+        <div className="card" style={{ background: endDate ? '#f0fdf4' : '#f8fafc', borderColor: endDate ? '#86efac' : '#e2e8f0' }}>
+          <div className="card-title">📅 Prazo do Lote</div>
+          <div className="g2" style={{ gap: 10 }}>
+            <div className="stat">
+              <div className="stat-label">Dias para concluir</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#1d4ed8' }}>{maxDays > 0 ? Math.ceil(maxDays) : '–'}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-label">Início</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{startDate ? fmtD(startDate) : '—'}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-label">Término previsto</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>{endDate ? fmtD(endDate) : '—'}</div>
+            </div>
+          </div>
+          {!lot.start_date && maxDays > 0 && (
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>Defina a data de início para ver o prazo.</div>
+          )}
+        </div>
+      )}
+
       {/* Tabela produção */}
       <div className="card">
         <div className="card-title">🪡 Itens de Produção</div>
         <div className="scroll-x">
           <table className="tbl">
-            <thead><tr><th>REF</th><th>Descrição</th><th>R$/pç</th><th>Tempo</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
+            <thead><tr><th>REF</th><th>Descrição</th><th>R$/pç</th><th>Tempo</th><th>Qtd</th><th>H.Total</th><th>Total R$</th><th></th></tr></thead>
             <tbody>
-              {items.map(item => (
-                <tr key={item.id}>
-                  <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
-                  <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
-                  <td><input className="tbl-input" style={{ width: 60 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
-                  <td><input className="tbl-input" style={{ width: 70 }} placeholder="01:00:00" value={item.time_per_piece || ''} onChange={e => setItemField(item, 'time_per_piece', e.target.value)} /></td>
-                  <td><input className="tbl-input" style={{ width: 40 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
-                  <td style={{ fontWeight: 600 }}>{R$(item.value * item.quantity)}</td>
-                  <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
-                </tr>
-              ))}
+              {items.map(item => {
+                const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
+                return (
+                  <tr key={item.id}>
+                    <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
+                    <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
+                    <td><input className="tbl-input" style={{ width: 60 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
+                    <td><input className="tbl-input" style={{ width: 70 }} placeholder="01:00:00" value={item.time_per_piece || ''} onChange={e => setItemField(item, 'time_per_piece', e.target.value)} /></td>
+                    <td><input className="tbl-input" style={{ width: 40 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
+                    <td style={{ fontSize: 11, color: '#64748b' }}>{fmtHours(itemSecs)}</td>
+                    <td style={{ fontWeight: 600 }}>{R$((item.value || 0) * (item.quantity || 0))}</td>
+                    <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
+                  </tr>
+                )
+              })}
             </tbody>
-            <tfoot><tr><td colSpan={5} style={{ textAlign: 'right' }}>TOTAL</td><td colSpan={2} style={{ fontWeight: 700, color: '#15803d' }}>{R$(totalProd)}</td></tr></tfoot>
+            <tfoot>
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600 }}>TOTAL</td>
+                <td></td>
+                <td style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 12 }}>{fmtHours(totalHoursSecs)}</td>
+                <td style={{ fontWeight: 700, color: '#15803d' }}>{R$(totalProd)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
@@ -104,91 +186,166 @@ function FaccoesTab({ lot, lotIdx }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
       </div>
 
-      {/* Resumo */}
-      <div className="card">
-        <div className="card-title">💰 Resumo Financeiro</div>
-        <div className="g2" style={{ gap: 10 }}>
-          <div className="stat"><div className="stat-label">Líquido</div><div className="stat-value" style={{ fontSize: 16, color: liquid >= 0 ? '#15803d' : '#dc2626' }}>{R$(liquid)}</div></div>
-          <div className="stat"><div className="stat-label">Por dia</div><div className="stat-value" style={{ fontSize: 16, color: '#1d4ed8' }}>{lot.work_days > 0 ? R$(liquid / lot.work_days) : R$(0)}</div></div>
-          <div className="stat"><div className="stat-label">Por hora</div><div className="stat-value" style={{ fontSize: 16, color: '#b45309' }}>{totalHours > 0 ? R$(liquid / totalHours) : R$(0)}</div></div>
-          <div className="stat"><div className="stat-label">Margem</div><div className="stat-value" style={{ fontSize: 16, color: '#6d28d9' }}>{totalProd > 0 ? pct((liquid / totalProd) * 100) : '0%'}</div></div>
-        </div>
-      </div>
-
       {/* Costureiras */}
       <div className="card">
         <div className="card-title">👥 Funcionários / Costureiras</div>
-        {workers.map((w, wi) => {
-          const wi_items = w.worker_items || []
-          // Cálculo por % do valor total de cada peça
-          const total = items.reduce((s, item) => {
-            const pctVal = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-            const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-            return s + (pctVal / 100) * itemTotal
-          }, 0)
-          const dailyRate = parseFloat(w.daily_rate) || 0
-          const impliedDays = dailyRate > 0 ? total / dailyRate : 0
-          return (
-            <div key={w.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '0.5px solid #e2e8f0' }}>
-              {/* Cabeçalho do colaborador */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        {workerAnalysis.map(({ worker: w, wi, workerHoursSecs, earned, daysNeeded, dailyEarned, dailyRate, isUnderMin }) => (
+          <div key={w.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '0.5px solid #e2e8f0' }}>
+            {/* Cabeçalho */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{w.name}</div>
-                <button onClick={() => deleteWorker(lotIdx, w.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, lineHeight: 1 }}
-                  title="Excluir colaborador">🗑</button>
+                {isUnderMin && <span style={{ fontSize: 11, background: '#fef2f2', color: '#dc2626', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>⚠ Abaixo do mínimo</span>}
               </div>
-              {/* Valor do dia de trabalho */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Valor/dia (R$):</label>
-                <input className="input" type="number" inputMode="decimal"
-                  value={w.daily_rate || ''} placeholder="0,00"
-                  style={{ maxWidth: 110, fontSize: 12, padding: '6px 8px' }}
-                  onChange={e => updateWorker(lotIdx, wi, w.id, { daily_rate: parseFloat(e.target.value) || 0 })} />
-              </div>
-              {/* Percentual por peça */}
-              {items.map(item => {
-                const pctVal = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-                const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-                const earned = (pctVal / 100) * itemTotal
-                return (
-                  <div key={item.ref} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, fontSize: 13 }}>
-                    <span style={{ width: 50, color: '#64748b', flexShrink: 0 }}>{item.ref}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <input className="input" type="number" inputMode="decimal"
-                        value={pctVal || ''} placeholder="0"
-                        style={{ width: 60, fontSize: 12, padding: '6px 8px', textAlign: 'right' }}
-                        onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
-                      <span style={{ fontSize: 12, color: '#64748b' }}>%</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: '#15803d', width: 72, textAlign: 'right', flexShrink: 0 }}>{R$(earned)}</span>
+              <button onClick={() => deleteWorker(lotIdx, w.id)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}
+                title="Excluir colaborador">🗑</button>
+            </div>
+            {/* Mínimo/dia */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Mínimo/dia (R$):</label>
+              <input className="input" type="number" inputMode="decimal"
+                value={w.daily_rate || ''} placeholder="0,00"
+                style={{ maxWidth: 110, fontSize: 12, padding: '6px 8px' }}
+                onChange={e => updateWorker(lotIdx, wi, w.id, { daily_rate: parseFloat(e.target.value) || 0 })} />
+            </div>
+            {/* % por peça */}
+            {items.map(item => {
+              const pctVal = parseFloat((w.worker_items || []).find(x => x.lot_item_ref === item.ref)?.value || 0)
+              const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
+              const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
+              const earned_item = (pctVal / 100) * itemTotal
+              const secs_item = (pctVal / 100) * itemSecs
+              return (
+                <div key={item.ref} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
+                  <span style={{ width: 44, color: '#64748b', flexShrink: 0 }}>{item.ref}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>{item.description}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                    <input className="input" type="number" inputMode="decimal"
+                      value={pctVal || ''} placeholder="0"
+                      style={{ width: 54, fontSize: 12, padding: '5px 6px', textAlign: 'right' }}
+                      onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
+                    <span style={{ color: '#64748b' }}>%</span>
                   </div>
-                )
-              })}
-              {/* Resumo do colaborador */}
-              <div className="g2" style={{ marginTop: 10, gap: 8 }}>
-                <div className="stat">
+                  <span style={{ color: '#15803d', width: 66, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{R$(earned_item)}</span>
+                  <span style={{ color: '#94a3b8', width: 60, textAlign: 'right', flexShrink: 0 }}>{secs_item > 0 ? fmtHours(secs_item) : ''}</span>
+                </div>
+              )
+            })}
+            {/* Resumo do colaborador */}
+            <div style={{ background: isUnderMin ? '#fef2f2' : '#f0fdf4', borderRadius: 8, padding: '10px 12px', marginTop: 10 }}>
+              <div className="g2" style={{ gap: 8 }}>
+                <div className="stat" style={{ background: 'transparent' }}>
                   <div className="stat-label">Total ganho</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>{R$(total)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>{R$(earned)}</div>
                 </div>
-                <div className="stat">
-                  <div className="stat-label">% do lote</div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{totalProd > 0 ? pct((total / totalProd) * 100) : '0%'}</div>
+                <div className="stat" style={{ background: 'transparent' }}>
+                  <div className="stat-label">Horas totais</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtHours(workerHoursSecs)}</div>
                 </div>
-                {dailyRate > 0 && (
-                  <div className="stat">
-                    <div className="stat-label">Dias impl.</div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{impliedDays.toFixed(1)}</div>
+                <div className="stat" style={{ background: 'transparent' }}>
+                  <div className="stat-label">Dias necessários</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#1d4ed8' }}>{daysNeeded > 0 ? daysNeeded.toFixed(1) : '–'}</div>
+                </div>
+                <div className="stat" style={{ background: 'transparent' }}>
+                  <div className="stat-label">Ganho/dia</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: isUnderMin ? '#dc2626' : '#15803d' }}>
+                    {dailyEarned > 0 ? R$(dailyEarned) : '–'}
+                    {dailyRate > 0 && <span style={{ fontSize: 11, marginLeft: 4, opacity: 0.8 }}>/ mín {R$(dailyRate)}</span>}
                   </div>
-                )}
+                </div>
               </div>
             </div>
-          )
-        })}
+          </div>
+        ))}
         <div style={{ display: 'flex', gap: 8 }}>
           <input className="input" placeholder="Nome da costureira" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
           <button className="btn btn-dark btn-sm" onClick={() => { if (newWorkerName.trim()) { addWorker(lotIdx, newWorkerName.trim()); setNewWorkerName('') } }}>+ Adicionar</button>
         </div>
+      </div>
+
+      {/* Relatório de capacidade por colaborador */}
+      {workerAnalysis.length > 0 && totalHoursSecs > 0 && (
+        <div className="card">
+          <div className="card-title">📋 Relatório de Capacidade</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+            Distribuição das horas do lote ({fmtHours(totalHoursSecs)} totais)
+          </div>
+          {workerAnalysis.map(({ worker: w, workerHoursSecs: wSecs, daysNeeded, dailyEarned, dailyRate, isUnderMin }) => {
+            const pctOfTotal = totalHoursSecs > 0 ? (wSecs / totalHoursSecs) * 100 : 0
+            return (
+              <div key={w.id} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>{w.name}</span>
+                  <span style={{ color: '#64748b' }}>{fmtHours(wSecs)} · {daysNeeded.toFixed(1)} dias</span>
+                </div>
+                <div className="prog">
+                  <div className="prog-fill" style={{
+                    width: `${Math.min(100, pctOfTotal)}%`,
+                    background: isUnderMin ? '#ef4444' : '#22c55e'
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
+                  <span>{pctOfTotal.toFixed(0)}% do tempo total</span>
+                  <span style={{ color: isUnderMin ? '#dc2626' : '#64748b', fontWeight: isUnderMin ? 700 : 400 }}>
+                    {dailyEarned > 0 ? `${R$(dailyEarned)}/dia` : ''}
+                    {isUnderMin ? ` ⚠ abaixo do mín (${R$(dailyRate)})` : ''}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+          {/* Referência: menor ganhador */}
+          {minEarner && (
+            <div style={{ background: '#fef3c7', borderRadius: 8, padding: '8px 10px', fontSize: 12, marginTop: 4 }}>
+              <b>Referência (menor ganho/dia):</b> {minEarner.worker.name} · {R$(minEarner.dailyEarned)}/dia
+              {minEarner.isUnderMin && ` — ⚠ abaixo do mínimo definido (${R$(minEarner.dailyRate)})`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resumo Financeiro Real */}
+      <div className="card">
+        <div className="card-title">💰 Resumo Financeiro Real</div>
+        {/* Linha detalhada */}
+        {[
+          { label: 'Receita bruta (lote)', val: totalProd, color: '#15803d' },
+          { label: '(-) Custo colaboradores', val: -totalWorkerCost, color: '#dc2626' },
+          { label: '(-) Outros gastos', val: -totalExp, color: '#dc2626' },
+        ].map(({ label, val, color }) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '0.5px solid #f1f5f9' }}>
+            <span style={{ color: '#64748b' }}>{label}</span>
+            <span style={{ fontWeight: 600, color }}>{R$(Math.abs(val))}</span>
+          </div>
+        ))}
+        {/* Resultado */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: 10, padding: '12px', borderRadius: 10,
+          background: trueProfit >= 0 ? '#dcfce7' : '#fef2f2',
+          border: `1.5px solid ${trueProfit >= 0 ? '#86efac' : '#fca5a5'}`
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>
+            {trueProfit >= 0 ? '✅ LUCRO REAL' : '❌ PREJUÍZO'}
+          </span>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 700, fontSize: 18, color: trueProfit >= 0 ? '#15803d' : '#dc2626' }}>{R$(trueProfit)}</div>
+            {maxDays > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>{R$(trueProfitPerDay)}/dia · {maxDays > 0 ? Math.ceil(maxDays) : 0} dias</div>}
+          </div>
+        </div>
+        {totalWorkerCost > 0 && totalProd > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div className="stat" style={{ flex: 1 }}>
+              <div className="stat-label">Margem real</div>
+              <div style={{ fontWeight: 700, color: trueProfit >= 0 ? '#15803d' : '#dc2626' }}>{pct((trueProfit / totalProd) * 100)}</div>
+            </div>
+            <div className="stat" style={{ flex: 1 }}>
+              <div className="stat-label">% colaboradores</div>
+              <div style={{ fontWeight: 700, color: '#b45309' }}>{pct((totalWorkerCost / totalProd) * 100)}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
