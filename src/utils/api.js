@@ -97,6 +97,10 @@ export const lotsAPI = {
     if (error) throw error
     return data
   },
+  updateWorker: async (id, data) =>
+    handle(supabase.from('workers').update(data).eq('id', id)),
+  deleteWorker: async (id) =>
+    handle(supabase.from('workers').delete().eq('id', id)),
 }
 
 export const dreAPI = {

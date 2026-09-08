@@ -75,6 +75,18 @@ function reducer(state, action) {
           }),
         }),
       }
+    case 'UPDATE_LOT_WORKER':
+      return {
+        ...state, lots: state.lots.map((l, i) => i !== action.lotIdx ? l : {
+          ...l, workers: (l.workers || []).map((w, wi) => wi !== action.workerIdx ? w : { ...w, ...action.data }),
+        }),
+      }
+    case 'DEL_LOT_WORKER':
+      return {
+        ...state, lots: state.lots.map((l, i) => i !== action.lotIdx ? l : {
+          ...l, workers: (l.workers || []).filter(w => w.id !== action.workerId),
+        }),
+      }
     case 'SET_VPL': return { ...state, vplProjects: action.projects }
     case 'ADD_TOAST': return { ...state, toasts: [...state.toasts, action.toast] }
     case 'DEL_TOAST': return { ...state, toasts: state.toasts.filter(t => t.id !== action.id) }
@@ -354,6 +366,18 @@ export function AppProvider({ children }) {
     } catch (err) { addToast(err.message, 'error') }
   }
 
+  const updateWorker = async (lotIdx, workerIdx, workerId, data) => {
+    dispatch({ type: 'UPDATE_LOT_WORKER', lotIdx, workerIdx, data })
+    try { await lotsAPI.updateWorker(workerId, data) }
+    catch (err) { addToast('Erro ao salvar colaborador', 'error') }
+  }
+
+  const deleteWorker = async (lotIdx, workerId) => {
+    dispatch({ type: 'DEL_LOT_WORKER', lotIdx, workerId })
+    try { await lotsAPI.deleteWorker(workerId) }
+    catch (err) { addToast('Erro ao excluir colaborador', 'error') }
+  }
+
   const updateWorkerItem = async (lotIdx, workerIdx, ref, val) => {
     dispatch({ type: 'UPDATE_WORKER_ITEM', lotIdx, workerIdx, ref, val })
     const worker = state.lots[lotIdx]?.workers?.[workerIdx]
@@ -400,7 +424,7 @@ export function AppProvider({ children }) {
     addLot, updateLot,
     addLotItem, updateLotItem, deleteItem,
     addExpense, deleteExpense,
-    addWorker, updateWorkerItem,
+    addWorker, updateWorker, deleteWorker, updateWorkerItem,
     upsertVPL, deleteVPL,
     updateIncome,
     loadUserData,
