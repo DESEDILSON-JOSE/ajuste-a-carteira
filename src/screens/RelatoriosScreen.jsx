@@ -941,7 +941,7 @@ export default function RelatoriosScreen() {
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {[['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['fixos', 'Fixos'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
+          {[['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} style={{ flex: 'none', minWidth: 'max-content', padding: '9px 12px' }} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -949,7 +949,6 @@ export default function RelatoriosScreen() {
         {subTab === '7dias' && <SevenDaysTab transactions={transactions} />}
         {subTab === 'mensal' && <MensalTab transactions={transactions} />}
         {subTab === 'anual' && <AnualTab transactions={transactions} />}
-        {subTab === 'fixos' && <GastosFixosTab />}
         {subTab === 'orcamento' && <OrcamentoTab transactions={transactions} />}
         {subTab === 'contas' && <ContasTab transactions={transactions} />}
         {subTab === 'conta' && <MinhaContaTab />}

@@ -8,11 +8,20 @@ const TYPES = [
   { id: 'transfer', label: 'Transferência', color: '#3b82f6' },
 ]
 
+const SPENDING_TYPES = [
+  { id: 'essencial', icon: '🏠', label: 'Essências', sub: 'Anual (12×)', color: '#1d4ed8', bg: '#eff6ff' },
+  { id: 'necessario', icon: '🛒', label: 'Necessários', sub: 'Único', color: '#15803d', bg: '#f0fdf4' },
+  { id: 'util', icon: '🔧', label: 'Úteis', sub: 'Único', color: '#b45309', bg: '#fffbeb' },
+  { id: 'desnecessario', icon: '⚠️', label: 'Desnecessários', sub: 'Único', color: '#dc2626', bg: '#fef2f2' },
+]
+
 const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 export default function AddTransactionModal() {
-  const { dispatch, addTx, state } = useApp()
+  const { dispatch, addTx, addToast, state } = useApp()
   const [type, setType] = useState('expense')
+  const [spendingType, setSpendingType] = useState(null)
   const [form, setForm] = useState({
     description: '', value: '', date: todayStr(),
     category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
@@ -29,16 +38,53 @@ export default function AddTransactionModal() {
     ? `${form.installments}x de ${R$(parseFloat(form.value) / form.installments)}`
     : ''
 
-  // Lista de membros do perfil ou padrão
   const members = state.profile?.members || []
 
   const handleSave = async () => {
     if (!form.value || !form.description) return
     setLoading(true)
+
+    const baseVal = parseFloat(form.value) || 0
+
+    // Essências = lança 12 meses recorrentes
+    if (type === 'expense' && spendingType === 'essencial') {
+      const year = new Date().getFullYear()
+      const rid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2)
+      let ok = 0
+      for (let m = 0; m < 12; m++) {
+        const day = Math.min(parseInt(form.date.split('-')[2]) || 7, DAYS_IN_MONTH[m])
+        const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        try {
+          await addTx({
+            type: 'expense',
+            description: form.description,
+            value: baseVal,
+            date,
+            category: form.category,
+            account: form.account,
+            paid: false,
+            notes: form.notes || 'Essência fixa',
+            recurring: true,
+            recurring_id: rid,
+            spending_type: 'essencial',
+            person: form.person || null,
+          })
+          ok++
+        } catch (_) {}
+      }
+      addToast(ok === 12 ? `${form.description}: 12 meses lançados!` : `${ok}/12 lançamentos criados`, ok === 12 ? 'success' : 'error')
+      setLoading(false)
+      close()
+      return
+    }
+
+    // Demais tipos — lançamento único
     await addTx({
       type,
       description: form.description,
-      value: parseFloat(form.value) || 0,
+      value: baseVal,
       date: form.date,
       category: form.category,
       account: form.account,
@@ -46,6 +92,7 @@ export default function AddTransactionModal() {
       notes: form.notes,
       installments: isCredit ? form.installments : 1,
       person: form.person || null,
+      spending_type: type === 'expense' ? spendingType : null,
     })
     setLoading(false)
     close()
@@ -59,18 +106,50 @@ export default function AddTransactionModal() {
         <div className="sheet-handle" />
 
         {/* Tipo */}
-        <div className="tabs" style={{ marginBottom: 20 }}>
+        <div className="tabs" style={{ marginBottom: 16 }}>
           {TYPES.map(t => (
             <button key={t.id} className={`tab${type === t.id ? ' active' : ''}`}
               style={type === t.id ? { background: t.color } : {}}
-              onClick={() => { setType(t.id); set('category', t.id === 'income' ? 'Trabalho' : 'Alimentação') }}>
+              onClick={() => {
+                setType(t.id)
+                setSpendingType(null)
+                set('category', t.id === 'income' ? 'Trabalho' : 'Alimentação')
+              }}>
               {t.label}
             </button>
           ))}
         </div>
 
+        {/* Classificação de despesa */}
+        {type === 'expense' && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginBottom: 8, letterSpacing: 0.5 }}>CLASSIFICAR COMO</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              {SPENDING_TYPES.map(st => (
+                <button key={st.id}
+                  onClick={() => setSpendingType(prev => prev === st.id ? null : st.id)}
+                  style={{
+                    background: spendingType === st.id ? st.bg : 'var(--card)',
+                    border: `1.5px solid ${spendingType === st.id ? st.color : 'transparent'}`,
+                    borderRadius: 10, padding: '7px 4px', cursor: 'pointer', textAlign: 'center',
+                    transition: 'all 0.15s',
+                  }}>
+                  <div style={{ fontSize: 18 }}>{st.icon}</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: spendingType === st.id ? st.color : '#374151', lineHeight: 1.2, marginTop: 2 }}>{st.label}</div>
+                  <div style={{ fontSize: 9, color: spendingType === st.id ? st.color : '#94a3b8', opacity: 0.85 }}>{st.sub}</div>
+                </button>
+              ))}
+            </div>
+            {spendingType === 'essencial' && (
+              <div style={{ marginTop: 6, fontSize: 11, color: '#1d4ed8', background: '#eff6ff', borderRadius: 6, padding: '5px 10px' }}>
+                🏠 Essência fixa — vai criar 12 lançamentos mensais para {new Date().getFullYear()} automaticamente
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Valor */}
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>VALOR</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             <span style={{ fontSize: 24, fontWeight: 700, color: typeColor }}>R$</span>
@@ -82,9 +161,7 @@ export default function AddTransactionModal() {
               style={{ fontSize: 36, fontWeight: 700, color: typeColor, border: 'none', outline: 'none', width: 160, textAlign: 'center', fontFamily: 'inherit', background: 'transparent' }}
             />
           </div>
-          {parcVal && (
-            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{parcVal}</div>
-          )}
+          {parcVal && <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{parcVal}</div>}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -106,7 +183,6 @@ export default function AddTransactionModal() {
             </div>
           </div>
 
-          {/* Parcelas — aparece só quando Cartão de Crédito */}
           {isCredit && type === 'expense' && (
             <div>
               <label className="label">Parcelas</label>
@@ -127,7 +203,6 @@ export default function AddTransactionModal() {
             </select>
           </div>
 
-          {/* Para quem? */}
           {members.length > 0 ? (
             <div>
               <label className="label">👤 Para quem?</label>
@@ -139,16 +214,11 @@ export default function AddTransactionModal() {
           ) : (
             <div>
               <label className="label">👤 Para quem? <span style={{ fontSize: 10, color: '#94a3b8' }}>(configure membros em Conta)</span></label>
-              <input
-                className="input"
-                placeholder="Ex: Desedilson, Jackellyne..."
-                value={form.person}
-                onChange={e => set('person', e.target.value)}
-              />
+              <input className="input" placeholder="Ex: Desedilson, Jackellyne..." value={form.person} onChange={e => set('person', e.target.value)} />
             </div>
           )}
 
-          {type === 'expense' && (
+          {type === 'expense' && spendingType !== 'essencial' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.paid} onChange={e => set('paid', e.target.checked)} style={{ width: 16, height: 16 }} />
               Já foi pago
@@ -163,7 +233,7 @@ export default function AddTransactionModal() {
           <div className="g2" style={{ marginTop: 4 }}>
             <button className="btn btn-ghost btn-full" onClick={close}>Cancelar</button>
             <button className="btn btn-dark btn-full" onClick={handleSave} disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar'}
+              {loading ? 'Salvando...' : spendingType === 'essencial' ? '💾 Salvar 12 meses' : 'Salvar'}
             </button>
           </div>
         </div>
