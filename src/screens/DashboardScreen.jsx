@@ -118,8 +118,8 @@ export default function DashboardScreen() {
     monthTxs.filter(t => t.type === 'expense').forEach(t => {
       byCategory[t.category] = (byCategory[t.category] || 0) + t.value
     })
-    const overdue = transactions.filter(t => t.type === 'expense' && !t.paid && t.date < today)
-    const dueToday = transactions.filter(t => t.type === 'expense' && !t.paid && t.date === today)
+    const overdue = monthTxs.filter(t => t.type === 'expense' && !t.paid && t.date <= today)
+    const dueToday = monthTxs.filter(t => t.type === 'expense' && !t.paid && t.date === today)
     return {
       monthTxs, totalIncome: inc, totalExpense: exp, balance: inc - exp,
       prevBalance: pInc - pExp,
