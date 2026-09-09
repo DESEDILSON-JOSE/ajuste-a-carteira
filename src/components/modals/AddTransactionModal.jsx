@@ -238,29 +238,6 @@ export default function AddTransactionModal() {
             </div>
           )}
 
-          {/* Parcelamento por meses para Necessário/Úteis/Desnecessário */}
-          {type === 'expense' && spendingType && spendingType !== 'essencial' && (
-            <div>
-              <label className="label">
-                Parcelamento em meses
-                {selectedST && <span style={{ color: selectedST.color, fontWeight: 600 }}> — {selectedST.icon} {selectedST.label}</span>}
-              </label>
-              <select className="input" value={form.spendingInstallments} onChange={e => set('spendingInstallments', parseInt(e.target.value))}>
-                <option value={1}>1x — pagamento único</option>
-                {[2,3,4,5,6,8,10,12,18,24].map(n => (
-                  <option key={n} value={n}>
-                    {n}x {form.value ? '— ' + R$(parseFloat(form.value) / n) + '/mês' : 'meses'}
-                  </option>
-                ))}
-              </select>
-              {form.spendingInstallments > 1 && (
-                <div style={{ marginTop: 6, fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '5px 10px' }}>
-                  Vai criar {form.spendingInstallments} lançamentos mensais a partir de {form.date}
-                </div>
-              )}
-            </div>
-          )}
-
           <div>
             <label className="label">Categoria</label>
             <select className="input" value={form.category} onChange={e => set('category', e.target.value)}>

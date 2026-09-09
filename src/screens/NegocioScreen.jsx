@@ -179,7 +179,7 @@ function FaccoesTab({ lot, lotIdx }) {
 
       {/* Prazo do lote */}
       {(maxDays > 0 || startDate) && (
-        <div className="card" style={{ borderColor: endDate ? '#22c55e' : 'rgba(255,255,255,0.08)' }}>
+        <div className="card" style={{ background: 'rgba(255,255,255,0.06)', borderColor: endDate ? '#22c55e' : 'rgba(255,255,255,0.08)' }}>
           <div className="card-title">📅 Prazo do Lote</div>
           <div className="g2" style={{ gap: 10 }}>
             <div className="stat">
