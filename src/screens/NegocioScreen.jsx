@@ -131,7 +131,7 @@ function FaccoesTab({ lot, lotIdx }) {
           <div className="prog">
             <div className="prog-fill" style={{ width: `${Math.min(100, usedPct)}%`, background: usedPct > 100 ? '#ef4444' : usedPct > 90 ? '#f59e0b' : '#22c55e' }} />
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
             {usedPct > 100 ? `🔴 Excede em ${fmtHours((totalHoursSecs - availableHours * 3600))}` :
               usedPct > 90 ? '🟡 Capacidade no limite' : '🟢 Capacidade OK'}
           </div>
@@ -217,7 +217,7 @@ function FaccoesTab({ lot, lotIdx }) {
                     <td><input className="tbl-input" style={{ width: 60 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
                     <td><input className="tbl-input" style={{ width: 70 }} placeholder="01:00:00" value={item.time_per_piece || ''} onChange={e => setItemField(item, 'time_per_piece', e.target.value)} /></td>
                     <td><input className="tbl-input" style={{ width: 40 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
-                    <td style={{ fontSize: 11, color: '#64748b' }}>{fmtHours(itemSecs)}</td>
+                    <td style={{ fontSize: 11, color: '#94a3b8' }}>{fmtHours(itemSecs)}</td>
                     <td style={{ fontWeight: 600 }}>{R$((item.value || 0) * (item.quantity || 0))}</td>
                     <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
                   </tr>
@@ -228,8 +228,8 @@ function FaccoesTab({ lot, lotIdx }) {
               <tr>
                 <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600 }}>TOTAL</td>
                 <td></td>
-                <td style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 12 }}>{fmtHours(totalHoursSecs)}</td>
-                <td style={{ fontWeight: 700, color: '#15803d' }}>{R$(totalProd)}</td>
+                <td style={{ fontWeight: 700, color: '#60a5fa', fontSize: 12 }}>{fmtHours(totalHoursSecs)}</td>
+                <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -251,12 +251,12 @@ function FaccoesTab({ lot, lotIdx }) {
             </div>
             <div className="prog">
               <div className="prog-fill" style={{
-                width: ,
+                width: progressPct + '%',
                 background: progressPct >= 100 ? '#22c55e' : progressPct > 60 ? '#3b82f6' : '#f59e0b'
               }} />
             </div>
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-              Dia {daysElapsed} de {totalDaysEvo} · {piecesPerDay > 0 ?  : ''}
+              Dia {daysElapsed} de {totalDaysEvo} · {piecesPerDay > 0 ? '~' + piecesPerDay + ' peças/dia' : ''}
             </div>
           </div>
           {piecesPerDay > 0 && totalDaysEvo > 0 && totalDaysEvo <= 20 && (
@@ -269,10 +269,10 @@ function FaccoesTab({ lot, lotIdx }) {
                   return (
                     <div key={d} style={{
                       background: isDone ? 'rgba(34,197,94,0.18)' : isToday ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.04)',
-                      border: ,
+                      border: isToday ? '1.5px solid #60a5fa' : isDone ? '1.5px solid rgba(74,222,128,0.3)' : '1.5px solid rgba(255,255,255,0.06)',
                       borderRadius: 8, padding: '6px 8px', textAlign: 'center', minWidth: 52
                     }}>
-                      <div style={{ fontSize: 10, color: '#64748b' }}>Dia {d+1}</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>Dia {d+1}</div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#4ade80' : isToday ? '#60a5fa' : '#94a3b8' }}>
                         {dayPcs}pç
                       </div>
@@ -292,7 +292,7 @@ function FaccoesTab({ lot, lotIdx }) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#94a3b8' }}>Total {fmtHours(totalHoursSecs)}</span>
-                <span style={{ fontWeight: 700, color: '#4ade80' }}>{R}</span>
+                <span style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</span>
               </div>
             </div>
           )}
@@ -330,12 +330,12 @@ function FaccoesTab({ lot, lotIdx }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{w.name}</div>
-                {isUnderMin && <span style={{ fontSize: 11, background: '#fef2f2', color: '#dc2626', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>⚠ Abaixo do mínimo</span>}
+                {isUnderMin && <span style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', color: '#f87171', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>⚠ Abaixo do mínimo</span>}
                 <button
                   onClick={() => updateWorker(lotIdx, wi, w.id, { is_family_income: !w.is_family_income })}
                   title={w.is_family_income ? 'Remover da receita familiar' : 'Marcar como receita da família'}
                   style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 600,
-                    background: w.is_family_income ? '#dcfce7' : '#f1f5f9',
+                    background: w.is_family_income ? 'rgba(74,222,128,0.15)' : '#f1f5f9',
                     color: w.is_family_income ? '#16a34a' : '#64748b' }}>
                   {w.is_family_income ? '👨‍👩‍👧 Família ✓' : '👤 Família?'}
                 </button>
@@ -370,26 +370,26 @@ function FaccoesTab({ lot, lotIdx }) {
               const secs_item = (pctVal / 100) * itemSecs
               return (
                 <div key={item.ref} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
-                  <span style={{ width: 44, color: '#64748b', flexShrink: 0 }}>{item.ref}</span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>{item.description}</span>
+                  <span style={{ width: 44, color: '#94a3b8', flexShrink: 0 }}>{item.ref}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#cbd5e1' }}>{item.description}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                     <input className="input" type="number" inputMode="decimal"
                       value={pctVal || ''} placeholder="0"
                       style={{ width: 54, fontSize: 12, padding: '5px 6px', textAlign: 'right' }}
                       onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
-                    <span style={{ color: '#64748b' }}>%</span>
+                    <span style={{ color: '#94a3b8' }}>%</span>
                   </div>
-                  <span style={{ color: '#15803d', width: 66, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{R$(earned_item)}</span>
+                  <span style={{ color: '#4ade80', width: 66, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{R$(earned_item)}</span>
                   <span style={{ color: '#94a3b8', width: 60, textAlign: 'right', flexShrink: 0 }}>{secs_item > 0 ? fmtHours(secs_item) : ''}</span>
                 </div>
               )
             })}
             {/* Resumo do colaborador */}
-            <div style={{ background: isUnderMin ? '#fef2f2' : '#f0fdf4', borderRadius: 8, padding: '10px 12px', marginTop: 10 }}>
+            <div style={{ background: isUnderMin ? 'rgba(239,68,68,0.1)' : 'rgba(74,222,128,0.08)', borderRadius: 8, padding: '10px 12px', marginTop: 10 }}>
               <div className="g2" style={{ gap: 8 }}>
                 <div className="stat" style={{ background: 'transparent' }}>
                   <div className="stat-label">Total ganho</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>{R$(earned)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#4ade80' }}>{R$(earned)}</div>
                 </div>
                 <div className="stat" style={{ background: 'transparent' }}>
                   <div className="stat-label">Horas totais</div>
@@ -397,7 +397,7 @@ function FaccoesTab({ lot, lotIdx }) {
                 </div>
                 <div className="stat" style={{ background: 'transparent' }}>
                   <div className="stat-label">Dias necessários</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#1d4ed8' }}>{daysNeeded > 0 ? daysNeeded.toFixed(1) : '–'}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#60a5fa' }}>{daysNeeded > 0 ? daysNeeded.toFixed(1) : '–'}</div>
                 </div>
                 <div className="stat" style={{ background: 'transparent' }}>
                   <div className="stat-label">Ganho/dia</div>
@@ -410,21 +410,21 @@ function FaccoesTab({ lot, lotIdx }) {
             </div>
             {/* Painel de receita familiar */}
             {w.is_family_income && (
-              <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
+              <div style={{ marginTop: 10, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', marginBottom: 8 }}>
                   👨‍👩‍👧 Receita da família — {R$(earned)} este lote
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn-sm" style={{ background: '#15803d', color: '#fff', fontSize: 12 }}
+                  <button className="btn btn-sm" style={{ background: 'rgba(74,222,128,0.2)', color: '#4ade80', fontSize: 12 }}
                     onClick={() => addFamilyIncomeTx(w.name, earned)}>
                     📥 Lançar renda do mês
                   </button>
-                  <button className="btn btn-sm" style={{ background: '#1d4ed8', color: '#fff', fontSize: 12 }}
+                  <button className="btn btn-sm" style={{ background: 'rgba(96,165,250,0.2)', color: '#60a5fa', fontSize: 12 }}
                     onClick={() => addFamilyIncomeAnual(w.name, earned)}>
                     📅 Projetar anual (12×)
                   </button>
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
                   "Lançar renda do mês" registra {R$(earned)} como receita hoje. "Projetar anual" cria 12 lançamentos mensais de {R$(earned)} para {new Date().getFullYear()}.
                 </div>
               </div>
@@ -483,12 +483,12 @@ function FaccoesTab({ lot, lotIdx }) {
         <div className="card-title">💰 Resumo Financeiro Real</div>
         {/* Linha detalhada */}
         {[
-          { label: 'Receita bruta (lote)', val: totalProd, color: '#15803d' },
+          { label: 'Receita bruta (lote)', val: totalProd, color: '#4ade80' },
           { label: '(-) Custo colaboradores', val: -totalWorkerCost, color: '#dc2626' },
           { label: '(-) Outros gastos', val: -totalExp, color: '#dc2626' },
         ].map(({ label, val, color }) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '0.5px solid #f1f5f9' }}>
-            <span style={{ color: '#64748b' }}>{label}</span>
+            <span style={{ color: '#94a3b8' }}>{label}</span>
             <span style={{ fontWeight: 600, color }}>{R$(Math.abs(val))}</span>
           </div>
         ))}
@@ -496,7 +496,7 @@ function FaccoesTab({ lot, lotIdx }) {
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginTop: 10, padding: '12px', borderRadius: 10,
-          background: trueProfit >= 0 ? '#dcfce7' : '#fef2f2',
+          background: trueProfit >= 0 ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
           border: `1.5px solid ${trueProfit >= 0 ? '#86efac' : '#fca5a5'}`
         }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>
@@ -504,7 +504,7 @@ function FaccoesTab({ lot, lotIdx }) {
           </span>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: 700, fontSize: 18, color: trueProfit >= 0 ? '#15803d' : '#dc2626' }}>{R$(trueProfit)}</div>
-            {maxDays > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>{R$(trueProfitPerDay)}/dia · {maxDays > 0 ? Math.ceil(maxDays) : 0} dias</div>}
+            {maxDays > 0 && <div style={{ fontSize: 12, color: '#94a3b8' }}>{R$(trueProfitPerDay)}/dia · {maxDays > 0 ? Math.ceil(maxDays) : 0} dias</div>}
           </div>
         </div>
         {totalWorkerCost > 0 && totalProd > 0 && (
@@ -528,16 +528,16 @@ function FaccoesTab({ lot, lotIdx }) {
 const DRE_STRUCTURE = [
   { key: 'rec_bruta', label: 'RECEITA BRUTA', type: 'input', rows: true },
   { key: 'deducoes', label: '(-) DEDUÇÕES', type: 'input', rows: true },
-  { key: 'rec_liq', label: '(=) RECEITA LÍQUIDA', type: 'calc', color: '#dcfce7' },
+  { key: 'rec_liq', label: '(=) RECEITA LÍQUIDA', type: 'calc', color: 'rgba(74,222,128,0.15)' },
   { key: 'cmv', label: '(-) CMV (Facção)', type: 'auto', color: '#fef3c7' },
-  { key: 'lucro_bruto', label: '(=) LUCRO BRUTO', type: 'calc', color: '#dcfce7' },
+  { key: 'lucro_bruto', label: '(=) LUCRO BRUTO', type: 'calc', color: 'rgba(74,222,128,0.15)' },
   { key: 'desp_op', label: '(-) DESPESAS OPERACIONAIS', type: 'input', rows: true },
-  { key: 'ebitda', label: '(=) EBITDA', type: 'calc', color: '#dcfce7' },
+  { key: 'ebitda', label: '(=) EBITDA', type: 'calc', color: 'rgba(74,222,128,0.15)' },
   { key: 'desp_fin', label: '(-) DESPESAS FINANCEIRAS', type: 'input' },
   { key: 'rec_fin', label: '(+) RECEITAS FINANCEIRAS', type: 'input' },
-  { key: 'lair', label: '(=) LAIR', type: 'calc', color: '#dcfce7' },
+  { key: 'lair', label: '(=) LAIR', type: 'calc', color: 'rgba(74,222,128,0.15)' },
   { key: 'ir', label: '(-) IR e CSLL', type: 'input' },
-  { key: 'lucro_liq', label: '(=) LUCRO LÍQUIDO', type: 'calc', color: '#dcfce7', big: true },
+  { key: 'lucro_liq', label: '(=) LUCRO LÍQUIDO', type: 'calc', color: 'rgba(74,222,128,0.15)', big: true },
 ]
 
 function DreTab({ lots, userId }) {
@@ -605,7 +605,7 @@ function DreTab({ lots, userId }) {
           if (row.type === 'input' && row.rows) {
             return (
               <div key={row.key} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{row.label}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>{row.label}</div>
                 {(dre[row.key] || []).map((r, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                     <input className="input" style={{ flex: 1 }} placeholder="Descrição" value={r.desc} onChange={e => setRow(row.key, i, 'desc', e.target.value)} />
@@ -619,7 +619,7 @@ function DreTab({ lots, userId }) {
           if (row.type === 'input') {
             return (
               <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, color: '#64748b' }}>{row.label}</span>
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>{row.label}</span>
                 <input className="input" style={{ width: 120 }} type="number" inputMode="decimal"
                   value={dre[row.key] || ''} onChange={e => setDre(d => ({ ...d, [row.key]: e.target.value }))} />
               </div>
@@ -770,7 +770,7 @@ function VplTab({ userId }) {
                     <td><input className="tbl-input" style={{ width: 80 }} type="number" inputMode="decimal" value={f.receitas || ''} onChange={e => setFlows(fl => fl.map((x, j) => j === i ? { ...x, receitas: e.target.value } : x))} /></td>
                     <td><input className="tbl-input" style={{ width: 80 }} type="number" inputMode="decimal" value={f.custos || ''} onChange={e => setFlows(fl => fl.map((x, j) => j === i ? { ...x, custos: e.target.value } : x))} /></td>
                     <td style={{ fontWeight: 600, color: fcLiq >= 0 ? '#15803d' : '#dc2626' }}>{R$(fcLiq)}</td>
-                    <td style={{ color: '#64748b', fontSize: 11 }}>{R$(fcDesc)}</td>
+                    <td style={{ color: '#94a3b8', fontSize: 11 }}>{R$(fcDesc)}</td>
                   </tr>
                 )
               })}
@@ -787,11 +787,11 @@ function VplTab({ userId }) {
         <div className="stat"><div className="stat-label">IL</div><div className="stat-value" style={{ fontSize: 16, color: il >= 1 ? '#15803d' : '#dc2626' }}>{il.toFixed(2)}</div></div>
       </div>
 
-      <div className="card" style={{ textAlign: 'center', background: vpl >= 0 ? '#dcfce7' : '#fef2f2', borderColor: vpl >= 0 ? '#22c55e' : '#ef4444' }}>
+      <div className="card" style={{ textAlign: 'center', background: vpl >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.1)', borderColor: vpl >= 0 ? '#22c55e' : '#ef4444' }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>
           {vpl >= 0 ? '✅ PROJETO VIÁVEL' : '❌ PROJETO INVIÁVEL'}
         </div>
-        <div style={{ fontSize: 12, marginTop: 4, color: '#64748b' }}>VPL {vpl >= 0 ? 'positivo' : 'negativo'} · TIR {pct(tir, 2)} · IL {il.toFixed(2)}</div>
+        <div style={{ fontSize: 12, marginTop: 4, color: '#94a3b8' }}>VPL {vpl >= 0 ? 'positivo' : 'negativo'} · TIR {pct(tir, 2)} · IL {il.toFixed(2)}</div>
       </div>
 
       {/* Gráfico */}
@@ -842,7 +842,7 @@ function VplTab({ userId }) {
               <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid #e2e8f0' }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>Inv: {R$(p.investment)} · VPL: <span style={{ color: v >= 0 ? '#15803d' : '#dc2626' }}>{R$(v)}</span></div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Inv: {R$(p.investment)} · VPL: <span style={{ color: v >= 0 ? '#15803d' : '#dc2626' }}>{R$(v)}</span></div>
                 </div>
                 <button onClick={() => { if (window.confirm('Excluir?')) deleteVPL(p.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button>
               </div>

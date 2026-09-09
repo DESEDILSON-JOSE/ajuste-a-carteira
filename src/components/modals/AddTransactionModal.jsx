@@ -9,10 +9,10 @@ const TYPES = [
 ]
 
 const SPENDING_TYPES = [
-  { id: 'essencial', icon: '🏠', label: 'Essências', sub: 'Anual (12×)', color: '#1d4ed8', bg: '#eff6ff' },
-  { id: 'necessario', icon: '🛒', label: 'Necessários', sub: 'Único', color: '#15803d', bg: '#f0fdf4' },
-  { id: 'util', icon: '🔧', label: 'Úteis', sub: 'Único', color: '#b45309', bg: '#fffbeb' },
-  { id: 'desnecessario', icon: '⚠️', label: 'Desnecessários', sub: 'Único', color: '#dc2626', bg: '#fef2f2' },
+  { id: 'essencial', icon: '🏠', label: 'Essências', sub: 'Anual (12×)', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  { id: 'necessario', icon: '🛒', label: 'Necessário', sub: 'Parcelável', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
+  { id: 'util', icon: '🔧', label: 'Úteis', sub: 'Parcelável', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+  { id: 'desnecessario', icon: '⚠️', label: 'Desnecessário', sub: 'Parcelável', color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
 
 const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
@@ -25,7 +25,7 @@ export default function AddTransactionModal() {
   const [form, setForm] = useState({
     description: '', value: '', date: todayStr(),
     category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
-    installments: 1, person: '',
+    installments: 1, spendingInstallments: 1, person: '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -34,8 +34,10 @@ export default function AddTransactionModal() {
   const cats = type === 'income' ? CATS_INCOME : CATS_EXPENSE
   const typeColor = TYPES.find(t => t.id === type)?.color
   const isCredit = form.account === 'Cartão de Crédito'
-  const parcVal = form.value && form.installments > 1
-    ? `${form.installments}x de ${R$(parseFloat(form.value) / form.installments)}`
+  const parcVal = form.value && form.installments > 1 && isCredit
+    ? form.installments + 'x de ' + R$(parseFloat(form.value) / form.installments)
+    : form.value && form.spendingInstallments > 1 && spendingType && spendingType !== 'essencial'
+    ? form.spendingInstallments + 'x de ' + R$(parseFloat(form.value) / form.spendingInstallments) + '/mês'
     : ''
 
   const members = state.profile?.members || []
@@ -55,7 +57,7 @@ export default function AddTransactionModal() {
       let ok = 0
       for (let m = 0; m < 12; m++) {
         const day = Math.min(parseInt(form.date.split('-')[2]) || 7, DAYS_IN_MONTH[m])
-        const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const date = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
         try {
           await addTx({
             type: 'expense',
@@ -74,13 +76,44 @@ export default function AddTransactionModal() {
           ok++
         } catch (_) {}
       }
-      addToast(ok === 12 ? `${form.description}: 12 meses lançados!` : `${ok}/12 lançamentos criados`, ok === 12 ? 'success' : 'error')
+      addToast(ok === 12 ? form.description + ': 12 meses lançados!' : ok + '/12 lançamentos criados', ok === 12 ? 'success' : 'error')
       setLoading(false)
       close()
       return
     }
 
-    // Demais tipos — lançamento único
+    // Necessário/Úteis/Desnecessário com parcelamento por meses
+    if (type === 'expense' && spendingType && spendingType !== 'essencial' && form.spendingInstallments > 1) {
+      const n = form.spendingInstallments
+      const baseDate = new Date(form.date + 'T12:00:00')
+      let ok = 0
+      for (let m = 0; m < n; m++) {
+        const d = new Date(baseDate)
+        d.setMonth(d.getMonth() + m)
+        const dateStr = d.toISOString().split('T')[0]
+        try {
+          await addTx({
+            type: 'expense',
+            description: form.description + ' (' + (m+1) + '/' + n + ')',
+            value: Math.round((baseVal / n) * 100) / 100,
+            date: dateStr,
+            category: form.category,
+            account: form.account,
+            paid: m === 0 ? form.paid : false,
+            notes: form.notes,
+            spending_type: spendingType,
+            person: form.person || null,
+          })
+          ok++
+        } catch(_) {}
+      }
+      addToast(form.description + ': ' + ok + '/' + n + ' meses lançados!', ok === n ? 'success' : 'error')
+      setLoading(false)
+      close()
+      return
+    }
+
+    // Lançamento único
     await addTx({
       type,
       description: form.description,
@@ -99,6 +132,7 @@ export default function AddTransactionModal() {
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const selectedST = SPENDING_TYPES.find(s => s.id === spendingType)
 
   return (
     <div className="overlay" onClick={close}>
@@ -108,7 +142,7 @@ export default function AddTransactionModal() {
         {/* Tipo */}
         <div className="tabs" style={{ marginBottom: 16 }}>
           {TYPES.map(t => (
-            <button key={t.id} className={`tab${type === t.id ? ' active' : ''}`}
+            <button key={t.id} className={'tab' + (type === t.id ? ' active' : '')}
               style={type === t.id ? { background: t.color } : {}}
               onClick={() => {
                 setType(t.id)
@@ -120,37 +154,9 @@ export default function AddTransactionModal() {
           ))}
         </div>
 
-        {/* Classificação de despesa */}
-        {type === 'expense' && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, marginBottom: 8, letterSpacing: 0.5 }}>CLASSIFICAR COMO</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-              {SPENDING_TYPES.map(st => (
-                <button key={st.id}
-                  onClick={() => setSpendingType(prev => prev === st.id ? null : st.id)}
-                  style={{
-                    background: spendingType === st.id ? st.bg : 'var(--card)',
-                    border: `1.5px solid ${spendingType === st.id ? st.color : 'transparent'}`,
-                    borderRadius: 10, padding: '7px 4px', cursor: 'pointer', textAlign: 'center',
-                    transition: 'all 0.15s',
-                  }}>
-                  <div style={{ fontSize: 18 }}>{st.icon}</div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: spendingType === st.id ? st.color : '#374151', lineHeight: 1.2, marginTop: 2 }}>{st.label}</div>
-                  <div style={{ fontSize: 9, color: spendingType === st.id ? st.color : '#94a3b8', opacity: 0.85 }}>{st.sub}</div>
-                </button>
-              ))}
-            </div>
-            {spendingType === 'essencial' && (
-              <div style={{ marginTop: 6, fontSize: 11, color: '#1d4ed8', background: '#eff6ff', borderRadius: 6, padding: '5px 10px' }}>
-                🏠 Essência fixa — vai criar 12 lançamentos mensais para {new Date().getFullYear()} automaticamente
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Valor */}
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>VALOR</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>VALOR</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             <span style={{ fontSize: 24, fontWeight: 700, color: typeColor }}>R$</span>
             <input
@@ -165,6 +171,41 @@ export default function AddTransactionModal() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Classificação de despesa — chips compactos */}
+          {type === 'expense' && (
+            <div>
+              <label className="label">Classificar como</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {SPENDING_TYPES.map(st => {
+                  const active = spendingType === st.id
+                  return (
+                    <button key={st.id}
+                      onClick={() => setSpendingType(prev => prev === st.id ? null : st.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        background: active ? st.bg : 'rgba(255,255,255,0.05)',
+                        border: '1.5px solid ' + (active ? st.color : 'rgba(255,255,255,0.1)'),
+                        borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
+                        fontSize: 12, fontWeight: active ? 700 : 400,
+                        color: active ? st.color : '#94a3b8',
+                        transition: 'all 0.15s',
+                      }}>
+                      <span>{st.icon}</span>
+                      <span>{st.label}</span>
+                      {active && <span style={{ fontSize: 10, opacity: 0.8 }}>· {st.sub}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              {spendingType === 'essencial' && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', borderRadius: 8, padding: '6px 10px' }}>
+                  🏠 Vai criar 12 lançamentos mensais para {new Date().getFullYear()} automaticamente
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="label">Descrição</label>
             <input className="input" placeholder="Ex: Supermercado" value={form.description} onChange={e => set('description', e.target.value)} />
@@ -183,16 +224,40 @@ export default function AddTransactionModal() {
             </div>
           </div>
 
+          {/* Parcelas cartão de crédito */}
           {isCredit && type === 'expense' && (
             <div>
-              <label className="label">Parcelas</label>
+              <label className="label">Parcelas (cartão)</label>
               <select className="input" value={form.installments} onChange={e => set('installments', parseInt(e.target.value))}>
                 {PARCELAS.map(n => (
                   <option key={n} value={n}>
-                    {n === 1 ? '1x (à vista)' : `${n}x${form.value ? ` de ${R$(parseFloat(form.value) / n)}` : ''}`}
+                    {n === 1 ? '1x (à vista)' : n + 'x' + (form.value ? ' de ' + R$(parseFloat(form.value) / n) : '')}
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Parcelamento por meses para Necessário/Úteis/Desnecessário */}
+          {type === 'expense' && spendingType && spendingType !== 'essencial' && (
+            <div>
+              <label className="label">
+                Parcelamento em meses
+                {selectedST && <span style={{ color: selectedST.color, fontWeight: 600 }}> — {selectedST.icon} {selectedST.label}</span>}
+              </label>
+              <select className="input" value={form.spendingInstallments} onChange={e => set('spendingInstallments', parseInt(e.target.value))}>
+                <option value={1}>1x — pagamento único</option>
+                {[2,3,4,5,6,8,10,12,18,24].map(n => (
+                  <option key={n} value={n}>
+                    {n}x {form.value ? '— ' + R$(parseFloat(form.value) / n) + '/mês' : 'meses'}
+                  </option>
+                ))}
+              </select>
+              {form.spendingInstallments > 1 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '5px 10px' }}>
+                  Vai criar {form.spendingInstallments} lançamentos mensais a partir de {form.date}
+                </div>
+              )}
             </div>
           )}
 
@@ -233,7 +298,7 @@ export default function AddTransactionModal() {
           <div className="g2" style={{ marginTop: 4 }}>
             <button className="btn btn-ghost btn-full" onClick={close}>Cancelar</button>
             <button className="btn btn-dark btn-full" onClick={handleSave} disabled={loading}>
-              {loading ? 'Salvando...' : spendingType === 'essencial' ? '💾 Salvar 12 meses' : 'Salvar'}
+              {loading ? 'Salvando...' : spendingType === 'essencial' ? '💾 Salvar 12 meses' : form.spendingInstallments > 1 ? '💾 Salvar ' + form.spendingInstallments + 'x' : 'Salvar'}
             </button>
           </div>
         </div>
