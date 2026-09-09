@@ -124,7 +124,7 @@ export default function DashboardScreen() {
       monthTxs, totalIncome: inc, totalExpense: exp, balance: inc - exp,
       prevBalance: pInc - pExp,
       byCategory, overdue, dueToday,
-      last8: transactions.slice(0, 8),
+      last8: [...monthTxs].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8),
     }
   }, [transactions, selM, selY, today])
 
@@ -302,6 +302,7 @@ export default function DashboardScreen() {
           </div>
         )}
 
+
         {/* Últimas transações */}
         {last8.length > 0 && (
           <div className="card">
@@ -318,10 +319,10 @@ export default function DashboardScreen() {
                     {t.type === 'income' ? '+' : '-'}{R$(t.value)}
                   </div>
                   {t.type === 'expense' && !t.paid && (
-            <button onClick={() => updateTx(t.id, { paid: true })} style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#fbbf24', borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '3px 8px', cursor: 'pointer', marginTop: 2 }}>
-              pendente · ✓ Pagar
-            </button>
-          )}
+                    <button onClick={() => updateTx(t.id, { paid: true })} style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid #f59e0b', color: '#fbbf24', borderRadius: 6, fontSize: 11, fontWeight: 700, padding: '3px 8px', cursor: 'pointer', marginTop: 2 }}>
+                      pendente · ✓ Pagar
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
