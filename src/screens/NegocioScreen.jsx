@@ -61,7 +61,7 @@ function FaccoesTab({ lot, lotIdx }) {
       const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
       return s + (p / 100) * itemTotal
     }, 0)
-    const hoursPerDay = lot.hours_per_day || 8
+    const hoursPerDay = parseFloat(w.hours_per_day) || lot.hours_per_day || 8
     const daysNeeded = hoursPerDay > 0 ? (workerHoursSecs / 3600) / hoursPerDay : 0
     const dailyEarned = daysNeeded > 0 ? earned / daysNeeded : 0
     const dailyRate = parseFloat(w.daily_rate) || 0
@@ -88,6 +88,20 @@ function FaccoesTab({ lot, lotIdx }) {
   const totalWorkerCost = workerAnalysis.reduce((s, a) => s + a.earned, 0)
   const trueProfit = totalProd - totalWorkerCost - totalExp
   const trueProfitPerDay = maxDays > 0 ? trueProfit / maxDays : 0
+
+  const teamRealDailyHours = workers.length > 0
+    ? workers.reduce((s, w) => s + (parseFloat(w.hours_per_day) || lot.hours_per_day || 8), 0)
+    : (lot.team_size || 0) * (lot.hours_per_day || 8)
+  const teamRealDailyHoursConfig = (lot.team_size || 0) * (lot.hours_per_day || 8)
+  const totalQty = items.reduce((s, i) => s + (parseInt(i.quantity) || 0), 0)
+  const secsPerPiece = totalQty > 0 ? totalHoursSecs / totalQty : 0
+  const piecesPerDay = secsPerPiece > 0 && teamRealDailyHours > 0
+    ? Math.floor((teamRealDailyHours * 3600) / secsPerPiece) : 0
+  const totalDaysEvo = piecesPerDay > 0 ? Math.ceil(totalQty / piecesPerDay) : 0
+  const todayDate = new Date()
+  const daysElapsed = startDate ? Math.max(0, Math.floor((todayDate - startDate) / (24*3600*1000))) : 0
+  const piecesCompleted = Math.min(totalQty, daysElapsed * piecesPerDay)
+  const progressPct = totalQty > 0 ? (piecesCompleted / totalQty) * 100 : 0
 
   return (
     <div>
@@ -124,14 +138,53 @@ function FaccoesTab({ lot, lotIdx }) {
         </div>
       </div>
 
+      {/* Raio X */}
+      {workers.length > 0 && (
+        <div className="card">
+          <div className="card-title">🔭 Raio X — Capacidade</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div style={{ background: 'rgba(59,130,246,0.12)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>⚙️ Config. global</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#60a5fa' }}>{teamRealDailyHoursConfig}h/dia</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{lot.team_size || 0} func × {lot.hours_per_day || 0}h</div>
+            </div>
+            <div style={{ background: 'rgba(34,197,94,0.12)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>👥 Real cadastrados</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#4ade80' }}>{teamRealDailyHours}h/dia</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{workers.length} colaboradores</div>
+            </div>
+          </div>
+          {workers.map(w => {
+            const wh = parseFloat(w.hours_per_day) || lot.hours_per_day || 8
+            const pctCap = teamRealDailyHours > 0 ? (wh / teamRealDailyHours) * 100 : 0
+            return (
+              <div key={w.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 600 }}>{w.name}</span>
+                  <span style={{ color: '#94a3b8' }}>{wh}h/dia · {pctCap.toFixed(0)}% da equipe</span>
+                </div>
+                <div className="prog">
+                  <div className="prog-fill" style={{ width: , background: '#3b82f6' }} />
+                </div>
+              </div>
+            )
+          })}
+          {piecesPerDay > 0 && (
+            <div style={{ background: 'rgba(245,158,11,0.12)', borderRadius: 8, padding: '8px 12px', marginTop: 6, fontSize: 12, border: '1px solid rgba(245,158,11,0.2)' }}>
+              <span style={{ color: '#fbbf24', fontWeight: 700 }}>🎯 Ritmo real: ~{piecesPerDay} peças/dia · {totalDaysEvo} dias p/ concluir</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Prazo do lote */}
       {(maxDays > 0 || startDate) && (
-        <div className="card" style={{ background: endDate ? '#f0fdf4' : '#f8fafc', borderColor: endDate ? '#86efac' : '#e2e8f0' }}>
+        <div className="card" style={{ borderColor: endDate ? '#22c55e' : 'rgba(255,255,255,0.08)' }}>
           <div className="card-title">📅 Prazo do Lote</div>
           <div className="g2" style={{ gap: 10 }}>
             <div className="stat">
               <div className="stat-label">Dias para concluir</div>
-              <div style={{ fontWeight: 700, fontSize: 18, color: '#1d4ed8' }}>{maxDays > 0 ? Math.ceil(maxDays) : '–'}</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#60a5fa' }}>{maxDays > 0 ? Math.ceil(maxDays) : '–'}</div>
             </div>
             <div className="stat">
               <div className="stat-label">Início</div>
@@ -139,7 +192,7 @@ function FaccoesTab({ lot, lotIdx }) {
             </div>
             <div className="stat">
               <div className="stat-label">Término previsto</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>{endDate ? fmtD(endDate) : '—'}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#4ade80' }}>{endDate ? fmtD(endDate) : '—'}</div>
             </div>
           </div>
           {!lot.start_date && maxDays > 0 && (
@@ -184,6 +237,67 @@ function FaccoesTab({ lot, lotIdx }) {
         </div>
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
       </div>
+
+      {/* Evolução do Lote */}
+      {startDate && maxDays > 0 && totalQty > 0 && (
+        <div className="card">
+          <div className="card-title">📈 Evolução do Lote</div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+              <span style={{ color: '#94a3b8' }}>Progresso estimado</span>
+              <span style={{ fontWeight: 700, color: progressPct >= 100 ? '#4ade80' : '#60a5fa' }}>
+                {piecesCompleted}/{totalQty} peças · {progressPct.toFixed(0)}%
+              </span>
+            </div>
+            <div className="prog">
+              <div className="prog-fill" style={{
+                width: ,
+                background: progressPct >= 100 ? '#22c55e' : progressPct > 60 ? '#3b82f6' : '#f59e0b'
+              }} />
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+              Dia {daysElapsed} de {totalDaysEvo} · {piecesPerDay > 0 ?  : ''}
+            </div>
+          </div>
+          {piecesPerDay > 0 && totalDaysEvo > 0 && totalDaysEvo <= 20 && (
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ display: 'flex', gap: 4, minWidth: 'max-content', paddingBottom: 4 }}>
+                {Array.from({ length: totalDaysEvo }, (_, d) => {
+                  const dayPcs = Math.min(totalQty - d * piecesPerDay, piecesPerDay)
+                  const isDone = d < daysElapsed
+                  const isToday = d === daysElapsed
+                  return (
+                    <div key={d} style={{
+                      background: isDone ? 'rgba(34,197,94,0.18)' : isToday ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.04)',
+                      border: ,
+                      borderRadius: 8, padding: '6px 8px', textAlign: 'center', minWidth: 52
+                    }}>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>Dia {d+1}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#4ade80' : isToday ? '#60a5fa' : '#94a3b8' }}>
+                        {dayPcs}pç
+                      </div>
+                      {isToday && <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 700 }}>hoje</div>}
+                      {isDone && <div style={{ fontSize: 9, color: '#4ade80' }}>✓</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {totalHoursSecs > 0 && (
+            <div style={{ marginTop: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: '#94a3b8' }}>Valor médio por hora</span>
+                <span style={{ fontWeight: 700, color: '#60a5fa' }}>R$ {totalHours > 0 ? (totalProd / totalHours).toFixed(2).replace('.', ',') : '0,00'}/h</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#94a3b8' }}>Total {fmtHours(totalHoursSecs)}</span>
+                <span style={{ fontWeight: 700, color: '#4ade80' }}>{R}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gastos */}
       <div className="card">
@@ -237,6 +351,15 @@ function FaccoesTab({ lot, lotIdx }) {
                 value={w.daily_rate || ''} placeholder="0,00"
                 style={{ maxWidth: 110, fontSize: 12, padding: '6px 8px' }}
                 onChange={e => updateWorker(lotIdx, wi, w.id, { daily_rate: parseFloat(e.target.value) || 0 })} />
+            </div>
+            {/* Horas/dia individual */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Horas/dia:</label>
+              <input className="input" type="number" inputMode="decimal"
+                value={w.hours_per_day || ''} placeholder={lot.hours_per_day || 8}
+                style={{ maxWidth: 80, fontSize: 12, padding: '6px 8px' }}
+                onChange={e => updateWorker(lotIdx, wi, w.id, { hours_per_day: parseFloat(e.target.value) || 0 })} />
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>h/dia (global: {lot.hours_per_day || 8}h)</span>
             </div>
             {/* % por peça */}
             {items.map(item => {
@@ -318,8 +441,8 @@ function FaccoesTab({ lot, lotIdx }) {
       {workerAnalysis.length > 0 && totalHoursSecs > 0 && (
         <div className="card">
           <div className="card-title">📋 Relatório de Capacidade</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-            Distribuição das horas do lote ({fmtHours(totalHoursSecs)} totais)
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
+            Distribuição das horas do lote ({fmtHours(totalHoursSecs)} totais) · equipe: {teamRealDailyHours}h/dia
           </div>
           {workerAnalysis.map(({ worker: w, workerHoursSecs: wSecs, daysNeeded, dailyEarned, dailyRate, isUnderMin }) => {
             const pctOfTotal = totalHoursSecs > 0 ? (wSecs / totalHoursSecs) * 100 : 0
@@ -327,7 +450,7 @@ function FaccoesTab({ lot, lotIdx }) {
               <div key={w.id} style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                   <span style={{ fontWeight: 600 }}>{w.name}</span>
-                  <span style={{ color: '#64748b' }}>{fmtHours(wSecs)} · {daysNeeded.toFixed(1)} dias</span>
+                  <span style={{ color: '#94a3b8' }}>{fmtHours(wSecs)} · {daysNeeded.toFixed(1)} dias · {parseFloat(w.hours_per_day) || lot.hours_per_day || 8}h/dia</span>
                 </div>
                 <div className="prog">
                   <div className="prog-fill" style={{
