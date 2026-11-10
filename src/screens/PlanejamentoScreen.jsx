@@ -176,10 +176,10 @@ function GastosFixosTabP() {
 }
 
 const PILARES = [
-  { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação', 'Supermercado', 'Açougue', 'Padaria', 'Restaurante', 'Habitação', 'Transporte e Comunicação', 'Saúde e Cuidados'] },
+  { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação','Supermercado','Açougue','Padaria','Restaurante','Habitação','Transporte','Transporte e Comunicação','Saúde','Saúde e Cuidados','Utilities','Seguros','Pet','Assinaturas'] },
   { id: 'invest', label: '💰 Investimentos', pct: 20, cats: [] },
-  { id: 'opcio', label: '🎉 Opcionais', pct: 20, cats: ['Lazer', 'Vestuário', 'Despesas Pessoais'] },
-  { id: 'proj', label: '📚 Projetos de Vida', pct: 10, cats: ['Educação'] },
+  { id: 'opcio', label: '🎉 Opcionais', pct: 20, cats: ['Lazer','Vestuário','Despesas Pessoais'] },
+  { id: 'proj', label: '📚 Projetos de Vida', pct: 10, cats: ['Educação','Outros'] },
 ]
 
 function Speedometer({ score }) {
@@ -212,6 +212,19 @@ export default function PlanejamentoScreen() {
   const [fireForm, setFireForm] = useState({ renda: 5000, patrimonio: 0, aporte: 1000, taxa: 0.8 })
 
   const income = profile?.income || 3000
+
+  const fixosMensais = useMemo(() => {
+    const groups = {}
+    transactions.filter(t => t.recurring && t.type === 'expense').forEach(t => {
+      if (!groups[t.recurring_id]) groups[t.recurring_id] = t.value
+    })
+    return Object.values(groups).reduce((s, v) => s + v, 0)
+  }, [transactions])
+
+  const totalAporte = goals.reduce((s, g) => s + (g.monthly || 0), 0)
+  const savingPct = income > 0 ? (totalAporte / income) * 100 : 0
+  const fixosPct = income > 0 ? (fixosMensais / income) * 100 : 0
+  const babylonOk = savingPct >= 10
 
   const monthExpenses = useMemo(() => transactions.filter(t => {
     const d = new Date(t.date + 'T12:00:00')
@@ -323,6 +336,38 @@ export default function PlanejamentoScreen() {
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>📐 Regra 50/30/20</div>
               <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>50% para necessidades obrigatórias, 20% para investimentos e proteção, 20% para desejos e lazer, 10% para projetos de vida e educação.</div>
             </div>
+
+            {/* BABILÔNIA */}
+            <div className="card" style={{ borderTop: '3px solid #f59e0b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>📜 O Homem Mais Rico da Babilônia</div>
+                <span style={{ fontSize: 20 }}>{babylonOk ? '✅' : '⚠️'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#92400e', background: '#fef3c7', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.6 }}>
+                <strong>Questão Primordial:</strong> "De cada 10 moedas que ganhas, guarda pelo menos 1 para ti mesmo." — Arkad
+              </div>
+              <div className="g2" style={{ marginBottom: 8 }}>
+                <div className="stat">
+                  <div className="stat-label">Gastos Fixos/Renda</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: fixosPct > 70 ? '#ef4444' : fixosPct > 55 ? '#f59e0b' : '#22c55e' }}>{fixosPct.toFixed(1)}%</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-label">Taxa de Poupança</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: babylonOk ? '#22c55e' : '#ef4444' }}>{savingPct.toFixed(1)}%</div>
+                </div>
+              </div>
+              <div className="prog" style={{ marginBottom: 4 }}>
+                <div className="prog-fill" style={{ width: `${Math.min(100, savingPct * 5)}%`, background: babylonOk ? '#22c55e' : '#ef4444' }} />
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+                {babylonOk ? '✅ Você está pagando a si mesmo primeiro!' : `⚠️ Meta: guardar 10% da renda — faltam ${R$(income * 0.1 - totalAporte)}/mês`}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 8 }}>
+                <strong style={{ color: '#92400e' }}>7 Curas para uma Bolsa Vazia:</strong><br />
+                1️⃣ Pague-se primeiro (10%) &nbsp;·&nbsp; 2️⃣ Controle os gastos &nbsp;·&nbsp; 3️⃣ Multiplique seu ouro<br />
+                4️⃣ Proteja seu patrimônio &nbsp;·&nbsp; 5️⃣ Casa própria &nbsp;·&nbsp; 6️⃣ Renda futura &nbsp;·&nbsp; 7️⃣ Aumente sua capacidade
+              </div>
+            </div>
           </div>
         )}
 
@@ -334,6 +379,15 @@ export default function PlanejamentoScreen() {
               <div className="fire-number">{R$(fireNumber)}</div>
               <div className="fire-label">Patrimônio necessário para {R$(fireForm.renda)}/mês</div>
             </div>
+            {fixosMensais > 0 && (
+              <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 12 }}>
+                <div style={{ fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>📌 Seus gastos fixos mensais: {R$(fixosMensais)}</div>
+                <div style={{ color: '#94a3b8' }}>Para cobrir só os fixos, você precisaria de <strong style={{ color: '#f1f5f9' }}>{R$(fixosMensais * 300)}</strong> investidos (Regra 4%).</div>
+                {Number(fireForm.renda) < fixosMensais && (
+                  <div style={{ color: '#ef4444', marginTop: 4 }}>⚠️ Renda desejada é menor que seus gastos fixos atuais!</div>
+                )}
+              </div>
+            )}
 
             <div className="card">
               <div className="card-title">Parâmetros</div>
@@ -404,6 +458,8 @@ export default function PlanejamentoScreen() {
                 { label: '✅ Sem atrasos', max: 150, val: transactions.filter(t => t.type === 'expense' && !t.paid && t.date < new Date().toISOString().split('T')[0]).length === 0 ? 150 : 0 },
                 { label: '📊 Diversificação', max: 150, val: Math.min(150, goals.length * 30) },
                 { label: '⭐ Base', max: 50, val: 50 },
+                { label: '🏛️ Questão Primordial (poupança ≥10%)', max: 100, val: savingPct >= 10 ? 100 : (savingPct / 10) * 100 },
+                { label: '📌 Controle Fixos (< 70% renda)', max: 100, val: fixosPct <= 70 ? 100 : fixosPct <= 90 ? 50 : 0 },
               ].map(({ label, max, val }) => (
                 <div key={label} style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
