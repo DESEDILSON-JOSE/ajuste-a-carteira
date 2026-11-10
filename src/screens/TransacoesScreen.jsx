@@ -48,7 +48,15 @@ export default function TransacoesScreen() {
   }, [filtered])
 
   const handleDelete = (t) => {
-    if (window.confirm('Excluir "' + t.description + '"?')) deleteTx(t.id)
+    const monthName = MONTHS[parseInt(monthFilter.split('-')[1]) - 1]
+    const year = monthFilter.split('-')[0]
+    let msg = 'Excluir "' + t.description + '" de ' + monthName + '/' + year + '?'
+    if (t.recurring) {
+      msg += '\n\n📌 Gasto fixo — apenas este mês será removido. Os outros meses continuam intactos.'
+    } else if (t.installment_group_id) {
+      msg += '\n\n💳 Parcela ' + (t.installment_index || '?') + '/' + (t.installments || '?') + ' — apenas esta parcela será removida. As demais parcelas não serão afetadas.'
+    }
+    if (window.confirm(msg)) deleteTx(t.id)
   }
 
   const curYM = currentYearMonth()
