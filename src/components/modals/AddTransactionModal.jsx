@@ -10,6 +10,39 @@ const TYPES = [
 
 const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
 
+// Presets de categorias sugeridas
+const PRESETS_EXPENSE = [
+  { icon: '🏠', label: 'Casa', category: 'Habitação', hint: 'Aluguel / Condomínio / Energia' },
+  { icon: '🛒', label: 'Mercado', category: 'Supermercado', hint: 'Supermercado / Feira' },
+  { icon: '🚗', label: 'Transporte', category: 'Transporte', hint: 'Combustível / Uber / Ônibus' },
+  { icon: '💊', label: 'Saúde', category: 'Saúde', hint: 'Plano / Medicamento / Consulta' },
+  { icon: '🍽️', label: 'Alim. Fora', category: 'Alimentação', hint: 'Restaurante / Lanche' },
+  { icon: '💇', label: 'Beleza', category: 'Outros', hint: 'Cabelo / Salão / Barbearia' },
+  { icon: '🏥', label: 'Médico', category: 'Saúde', hint: 'Dentista / Psicólogo / Exames' },
+  { icon: '👨‍👩‍👧', label: 'Família', category: 'Outros', hint: 'Filhos / Dependentes' },
+  { icon: '🎓', label: 'Educação', category: 'Educação', hint: 'Cursos / Livros / Faculdade' },
+  { icon: '🐾', label: 'Pet', category: 'Pet', hint: 'Ração / Vet / Banho e Tosa' },
+  { icon: '🧹', label: 'Serviços', category: 'Outros', hint: 'Diarista / Jardineiro / Babá' },
+  { icon: '🏦', label: 'Financeiro', category: 'Outros', hint: 'Tarifas / Conta / Cartão' },
+  { icon: '📄', label: 'Impostos', category: 'Outros', hint: 'IPTU / IPVA / IR' },
+  { icon: '🛡️', label: 'Seguros', category: 'Seguros', hint: 'Vida / Auto / Residência' },
+  { icon: '💳', label: 'Dívidas', category: 'Outros', hint: 'Financiamento / Empréstimo' },
+  { icon: '🎬', label: 'Lazer', category: 'Lazer', hint: 'Cinema / Shows / Passeios' },
+  { icon: '👕', label: 'Roupas', category: 'Outros', hint: 'Moda / Calçados / Acessórios' },
+  { icon: '✈️', label: 'Viagem', category: 'Lazer', hint: 'Hotel / Passagem / Excursão' },
+  { icon: '📱', label: 'Assinaturas', category: 'Assinaturas', hint: 'Netflix / Spotify / Apps' },
+  { icon: '🎁', label: 'Presentes', category: 'Outros', hint: 'Aniversário / Doações' },
+]
+
+const PRESETS_INCOME = [
+  { icon: '💼', label: 'Salário', category: 'Trabalho', hint: 'Salário / CLT / PJ' },
+  { icon: '🏢', label: 'Empresa', category: 'Trabalho', hint: 'Pró-labore / Lucro' },
+  { icon: '🏘️', label: 'Aluguel', category: 'Renda Extra', hint: 'Aluguel recebido' },
+  { icon: '📈', label: 'Investimento', category: 'Investimentos', hint: 'Dividendos / Rendimentos' },
+  { icon: '🛠️', label: 'Freelance', category: 'Renda Extra', hint: 'Freela / Serviço avulso' },
+  { icon: '🎯', label: 'Bônus', category: 'Renda Extra', hint: 'Comissão / 13º / PLR' },
+]
+
 export default function AddTransactionModal() {
   const { dispatch, addTx, state } = useApp()
   const [type, setType] = useState('expense')
@@ -19,6 +52,7 @@ export default function AddTransactionModal() {
     return { description: '', value: '', date: defaultDate, category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '', installments: 1, person: '' }
   })
   const [loading, setLoading] = useState(false)
+  const [showPresets, setShowPresets] = useState(true)
 
   const close = () => dispatch({ type: 'SET_MODAL', modal: null })
 
@@ -90,6 +124,25 @@ export default function AddTransactionModal() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Presets */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label className="label" style={{ marginBottom: 0 }}>Sugestões rápidas</label>
+              <button onClick={() => setShowPresets(v => !v)} style={{ background: 'none', border: 'none', fontSize: 11, color: '#64748b', cursor: 'pointer' }}>{showPresets ? 'ocultar ▲' : 'ver ▼'}</button>
+            </div>
+            {showPresets && (
+              <div style={{ display: 'flex', overflowX: 'auto', gap: 6, paddingBottom: 4, scrollbarWidth: 'none' }}>
+                {(type === 'income' ? PRESETS_INCOME : PRESETS_EXPENSE).map(p => (
+                  <button key={p.label} onClick={() => { set('category', p.category); if (!form.description) set('description', p.hint) }}
+                    style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: form.category === p.category ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.06)', border: form.category === p.category ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 10px', cursor: 'pointer', minWidth: 58 }}>
+                    <span style={{ fontSize: 20 }}>{p.icon}</span>
+                    <span style={{ fontSize: 10, color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="label">Descrição</label>
