@@ -10,7 +10,7 @@ function currentYearMonth() {
 }
 
 export default function TransacoesScreen() {
-  const { state, updateTx, deleteTx } = useApp()
+  const { state, updateTx, deleteTx, dispatch } = useApp()
   const { transactions } = state
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -145,8 +145,16 @@ export default function TransacoesScreen() {
           </div>
         )}
         {monthFilter !== curYM && (
-          <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '6px 10px', marginBottom: 10 }}>
-            ⚠️ Visualizando {MONTHS[parseInt(monthFilter.split('-')[1]) - 1]} de {monthFilter.split('-')[0]} — não é o mês atual
+          <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span>⚠️ Visualizando {MONTHS[parseInt(monthFilter.split('-')[1]) - 1]} de {monthFilter.split('-')[0]} — não é o mês atual</span>
+            <button onClick={() => {
+              const [y, m] = monthFilter.split('-')
+              const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate()
+              try { localStorage.setItem('addTxDefaultDate', y + '-' + m + '-' + String(Math.min(15, lastDay)).padStart(2, '0')) } catch(e) {}
+              dispatch({ type: 'SET_MODAL', modal: 'add-tx' })
+            }} style={{ background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.4)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              ➕ Lançar neste mês
+            </button>
           </div>
         )}
 

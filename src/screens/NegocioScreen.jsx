@@ -27,6 +27,12 @@ function FaccoesTab({ lot, lotIdx }) {
     addToast(`Renda de ${workerName} lançada!`)
   }
 
+  const addLotIncomeTx = async () => {
+    if (netResult <= 0) { addToast('Resultado precisa ser positivo para lançar', 'error'); return }
+    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${lot.name}`, value: netResult, date: todayStr(), account: 'Pix', paid: true })
+    addToast(`Lote ${lot.name} lançado como receita!`)
+  }
+
   return (
     <div>
       {/* PRODUÇÃO GERAL */}
@@ -193,6 +199,11 @@ function FaccoesTab({ lot, lotIdx }) {
               </div>
             </div>
           </div>
+          {netResult > 0 && (
+            <button className="btn btn-dark btn-full" style={{ marginTop: 14 }} onClick={addLotIncomeTx}>
+              📥 Lançar {lot.name} como receita do mês
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -530,6 +541,69 @@ function VplTab({ userId }) {
   )
 }
 
+// ─── FATURAMENTO TAB ─────────────────────────────────────────
+function FaturamentoTab() {
+  const { state } = useApp()
+  const faccaoTxs = (state.transactions || []).filter(t => t.type === 'income' && t.description && t.description.startsWith('Facção - '))
+
+  const byLot = {}
+  faccaoTxs.forEach(t => {
+    const lotName = t.description.replace(/^Facção - /, '')
+    if (!byLot[lotName]) byLot[lotName] = { name: lotName, count: 0, total: 0, txs: [] }
+    byLot[lotName].count++
+    byLot[lotName].total += parseFloat(t.value) || 0
+    byLot[lotName].txs.push(t)
+  })
+
+  const lotsData = Object.values(byLot).sort((a, b) => b.total - a.total)
+  const grandTotal = lotsData.reduce((s, l) => s + l.total, 0)
+
+  if (lotsData.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+        <div style={{ fontSize: 40 }}>📊</div>
+        <div style={{ marginTop: 8, fontWeight: 600 }}>Nenhuma receita de facção lançada ainda</div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>Use o botão "Lançar como receita do mês" em Facções</div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-title">📊 Faturamento Total por Lote</div>
+        <div style={{ textAlign: 'right', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>TOTAL GERAL FATURADO</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: '#4ade80' }}>{R$(grandTotal)}</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{faccaoTxs.length} lançamento{faccaoTxs.length > 1 ? 's' : ''} registrado{faccaoTxs.length > 1 ? 's' : ''}</div>
+        </div>
+        {lotsData.map(l => (
+          <div key={l.name} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>🪡 {l.name}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{l.count} lançamento{l.count > 1 ? 's' : ''}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, color: '#4ade80', fontSize: 17 }}>{R$(l.total)}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>{grandTotal > 0 ? Math.round(l.total / grandTotal * 100) : 0}% do total</div>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
+              {[...l.txs].sort((a, b) => b.date.localeCompare(a.date)).map(t => (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#94a3b8' }}>{t.date}</span>
+                  <span style={{ color: '#4ade80', fontWeight: 600 }}>{R$(t.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN ────────────────────────────────────────────────────
 export default function NegocioScreen() {
   const { state, dispatch, addLot, addToast } = useApp()
@@ -548,7 +622,7 @@ export default function NegocioScreen() {
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12 }}>
-          {[['faccoes', 'Facções'], ['dre', 'DRE'], ['vpl', 'VPL/TIR']].map(([id, label]) => (
+          {[['faccoes', 'Facções'], ['dre', 'DRE'], ['vpl', 'VPL/TIR'], ['faturamento', '📊 Faturamento']].map(([id, label]) => (
             <button key={id} className={`tab${activeNegTab === id ? ' active' : ''}`}
               onClick={() => dispatch({ type: 'SET_NEG_TAB', tab: id })}>{label}</button>
           ))}
@@ -587,6 +661,7 @@ export default function NegocioScreen() {
 
         {activeNegTab === 'dre' && <DreTab lots={lots} userId={user?.id} />}
         {activeNegTab === 'vpl' && <VplTab userId={user?.id} />}
+        {activeNegTab === 'faturamento' && <FaturamentoTab />}
       </div>
     </div>
   )

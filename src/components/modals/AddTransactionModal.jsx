@@ -13,10 +13,10 @@ const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
 export default function AddTransactionModal() {
   const { dispatch, addTx, state } = useApp()
   const [type, setType] = useState('expense')
-  const [form, setForm] = useState({
-    description: '', value: '', date: todayStr(),
-    category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
-    installments: 1, person: '',
+  const [form, setForm] = useState(() => {
+    let defaultDate = todayStr()
+    try { const stored = localStorage.getItem('addTxDefaultDate'); if (stored) { defaultDate = stored; localStorage.removeItem('addTxDefaultDate') } } catch(e) {}
+    return { description: '', value: '', date: defaultDate, category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '', installments: 1, person: '' }
   })
   const [loading, setLoading] = useState(false)
 

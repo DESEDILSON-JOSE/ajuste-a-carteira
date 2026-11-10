@@ -35,6 +35,7 @@ function GastosFixosTabP() {
 
   const total = fixos.reduce((s, f) => s + f.value, 0)
   const totalAnual = total * 12
+  const [showRetroInfo, setShowRetroInfo] = React.useState(false)
 
   const handleSave = async () => {
     if (!form.description || !form.value) return
@@ -71,6 +72,11 @@ function GastosFixosTabP() {
           <div className="stat-label">Total Anual</div>
           <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R$(totalAnual)}</div>
         </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <span>ℹ️</span>
+        <span>Ao adicionar um gasto fixo, ele é lançado automaticamente em <strong>todos os 12 meses do ano</strong>. Para lançar em meses passados manualmente, vá em <strong>Transações → selecione o mês → ➕ Lançar neste mês</strong>.</span>
       </div>
 
       {fixos.length > 0 && (
