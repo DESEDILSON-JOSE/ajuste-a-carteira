@@ -205,6 +205,121 @@ function Speedometer({ score }) {
   )
 }
 
+function DiagnosticoTab({ goals, transactions, income }) {
+  const curM = new Date().getMonth() + 1
+  const curY = new Date().getFullYear()
+  const curTxs = transactions.filter(t => {
+    const d = new Date(t.date + 'T12:00:00')
+    return d.getMonth() + 1 === curM && d.getFullYear() === curY
+  })
+  const totalInc = curTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0)
+  const totalExp = curTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0)
+  const saldo = totalInc - totalExp
+  const pctComp = totalInc > 0 ? (totalExp / totalInc) * 100 : 0
+
+  const obrigCats = ['Alimentação','Supermercado','Açougue','Padaria','Restaurante','Habitação','Transporte','Transporte e Comunicação','Saúde','Saúde e Cuidados','Utilities','Seguros','Pet','Assinaturas']
+  const obrig = curTxs.filter(t => t.type === 'expense' && obrigCats.includes(t.category)).reduce((s, t) => s + t.value, 0)
+  const opcio = curTxs.filter(t => t.type === 'expense' && ['Lazer','Vestuário','Despesas Pessoais'].includes(t.category)).reduce((s, t) => s + t.value, 0)
+  const totalAp = goals.reduce((s, g) => s + (g.monthly || 0), 0)
+  const poupPct = income > 0 ? (totalAp / income) * 100 : 0
+  const obrigPct = income > 0 ? (obrig / income) * 100 : 0
+  const moradiaExp = curTxs.filter(t => t.type === 'expense' && t.category === 'Habitação').reduce((s, t) => s + t.value, 0)
+  const moradiaPct = income > 0 ? (moradiaExp / income) * 100 : 0
+  const opcPct = income > 0 ? (opcio / income) * 100 : 0
+  const fontes = new Set(curTxs.filter(t => t.type === 'income').map(t => t.category)).size
+
+  const emergGoal = goals.find(g => g.position === 0)
+  const emergScore = emergGoal && emergGoal.target > 0 ? Math.min(100, (emergGoal.current_val / emergGoal.target) * 100) : 0
+
+  const pillars = [
+    { label: '🎛️ Controle de Gastos', score: pctComp <= 70 ? 100 : pctComp <= 90 ? 70 : 40, desc: 'Comprometimento: ' + pctComp.toFixed(1) + '%' },
+    { label: '💰 Capacidade de Poupança', score: Math.min(100, poupPct * 5), desc: 'Taxa de poupança: ' + poupPct.toFixed(1) + '%' },
+    { label: '🌿 Diversificação de Renda', score: Math.min(100, fontes * 35), desc: fontes + ' fonte(s) de receita' },
+    { label: '🏠 Comprometimento Moradia', score: moradiaPct <= 30 ? 100 : moradiaPct <= 40 ? 70 : 40, desc: 'Moradia: ' + moradiaPct.toFixed(1) + '% da renda' },
+    { label: '🎉 Gastos Não Obrigatórios', score: opcPct <= 20 ? 100 : opcPct <= 30 ? 70 : 40, desc: 'Opcionais: ' + opcPct.toFixed(1) + '% da renda' },
+    { label: '🛡️ Segurança Financeira', score: emergScore, desc: 'Reserva de emergência' },
+  ]
+  const totalScore = Math.round(pillars.reduce((s, p) => s + p.score, 0) / pillars.length)
+  const scoreLabel = totalScore < 40 ? 'Atenção' : totalScore < 60 ? 'Regular' : totalScore < 80 ? 'Bom' : 'Excelente'
+  const scoreColor = totalScore < 40 ? '#ef4444' : totalScore < 60 ? '#f97316' : totalScore < 80 ? '#22c55e' : '#15803d'
+
+  const recs = []
+  if (moradiaPct <= 30) recs.push({ ok: true, text: 'Comprometimento de moradia dentro do ideal' })
+  if (obrigPct <= 50) recs.push({ ok: true, text: 'Despesas obrigatórias dentro do limite de 50% (' + obrigPct.toFixed(0) + '%)' })
+  else recs.push({ ok: false, text: 'Despesas obrigatórias acima de 50% (' + obrigPct.toFixed(0) + '%) — revise os fixos' })
+  if (poupPct >= 20) recs.push({ ok: true, text: 'Poupança em ' + poupPct.toFixed(0) + '% — acima da meta de 20%' })
+  else recs.push({ ok: false, text: 'Poupança em ' + poupPct.toFixed(0) + '% — meta mínima: 10% (Babilônia) ou 20% (50/30/20)' })
+  if (fontes >= 2) recs.push({ ok: true, text: 'Renda diversificada (' + fontes + ' fontes)' })
+  else recs.push({ ok: null, text: 'Considere diversificar fontes de renda' })
+  if (saldo >= 0) recs.push({ ok: true, text: 'Saldo positivo de ' + R$(saldo) + ' neste mês' })
+  else recs.push({ ok: false, text: 'Saldo negativo de ' + R$(Math.abs(saldo)) + ' — despesas acima da receita' })
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        {[
+          { label: 'RECEITA TOTAL', value: R$(totalInc), color: '#22c55e' },
+          { label: 'TOTAL DESPESAS', value: R$(totalExp), color: '#ef4444' },
+          { label: 'SALDO LIVRE', value: R$(saldo), color: saldo >= 0 ? '#22c55e' : '#ef4444' },
+          { label: '% COMPROMETIDO', value: pctComp.toFixed(1) + '%', color: pctComp <= 70 ? '#22c55e' : pctComp <= 90 ? '#f59e0b' : '#ef4444' },
+        ].map(c => (
+          <div key={c.label} className="stat" style={{ padding: '10px 12px' }}>
+            <div style={{ fontSize: 10, color: '#64748b', letterSpacing: 1, textTransform: 'uppercase' }}>{c.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: c.color, marginTop: 2 }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-title">🩺 Score Financeiro por Pilar</div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: '#64748b', fontSize: 10 }}>
+                <th style={{ textAlign: 'left', padding: '4px 6px' }}>Pilar</th>
+                <th style={{ textAlign: 'center', padding: '4px 6px' }}>Score</th>
+                <th style={{ textAlign: 'center', padding: '4px 6px' }}>Avaliação</th>
+                <th style={{ textAlign: 'center', padding: '4px 6px' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pillars.map(p => {
+                const c = p.score < 40 ? '#ef4444' : p.score < 70 ? '#f59e0b' : '#22c55e'
+                const lbl = p.score < 40 ? 'Atenção' : p.score < 70 ? 'Regular' : p.score < 90 ? 'Bom' : 'Excelente'
+                return (
+                  <tr key={p.label} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '8px 6px' }}>
+                      <div style={{ fontWeight: 600 }}>{p.label}</div>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>{p.desc}</div>
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 800, color: c, fontSize: 15 }}>{Math.round(p.score)}</td>
+                    <td style={{ textAlign: 'center', color: c, fontSize: 11 }}>{lbl}</td>
+                    <td style={{ textAlign: 'center', fontSize: 16 }}>{p.score >= 70 ? '✅' : '⚠️'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 800, fontSize: 14 }}>SCORE TOTAL</span>
+          <span style={{ fontWeight: 800, fontSize: 18, color: scoreColor }}>{totalScore}/100 <span style={{ fontSize: 13 }}>{scoreLabel}</span></span>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">💡 Recomendações Automáticas</div>
+        {recs.map((r, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: i < recs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', fontSize: 13 }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>{r.ok === true ? '✅' : r.ok === false ? '⚠️' : '💡'}</span>
+            <span style={{ color: r.ok === false ? '#f87171' : r.ok === true ? '#86efac' : '#fbbf24' }}>{r.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function PlanejamentoScreen() {
   const { state, dispatch, updateGoal, updateIncome } = useApp()
   const { goals, transactions, profile, selM, selY } = state
@@ -435,120 +550,7 @@ export default function PlanejamentoScreen() {
           </div>
         )}
 
-        {/* DIAGNÓSTICO FINANCEIRO */}
-        {subTab === 'diagnostico' && (() => {
-          const curM = new Date().getMonth() + 1
-          const curY = new Date().getFullYear()
-          const curTxs = transactions.filter(t => { const d = new Date(t.date + 'T12:00:00'); return d.getMonth() + 1 === curM && d.getFullYear() === curY })
-          const totalInc = curTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0)
-          const totalExp = curTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0)
-          const saldo = totalInc - totalExp
-          const pctComp = totalInc > 0 ? (totalExp / totalInc) * 100 : 0
-
-          const obrigCats = ['Alimentação','Supermercado','Açougue','Padaria','Restaurante','Habitação','Transporte','Transporte e Comunicação','Saúde','Saúde e Cuidados','Utilities','Seguros','Pet','Assinaturas']
-          const obrig = curTxs.filter(t => t.type === 'expense' && obrigCats.includes(t.category)).reduce((s, t) => s + t.value, 0)
-          const opcio = curTxs.filter(t => t.type === 'expense' && ['Lazer','Vestuário','Despesas Pessoais'].includes(t.category)).reduce((s, t) => s + t.value, 0)
-          const educ = curTxs.filter(t => t.type === 'expense' && ['Educação','Outros'].includes(t.category)).reduce((s, t) => s + t.value, 0)
-          const totalAp = goals.reduce((s, g) => s + (g.monthly || 0), 0)
-          const poupPct = income > 0 ? (totalAp / income) * 100 : 0
-          const obrigPct = income > 0 ? (obrig / income) * 100 : 0
-          const moradiaExp = curTxs.filter(t => t.type === 'expense' && t.category === 'Habitação').reduce((s, t) => s + t.value, 0)
-          const moradiaPct = income > 0 ? (moradiaExp / income) * 100 : 0
-          const opcPct = income > 0 ? (opcio / income) * 100 : 0
-
-          const fontes = new Set(curTxs.filter(t => t.type === 'income').map(t => t.category)).size
-
-          const pillars = [
-            { label: '🎛️ Controle de Gastos', score: pctComp <= 70 ? 100 : pctComp <= 90 ? 70 : 40, bench: '≥ 70', desc: `Comprometimento: ${pctComp.toFixed(1)}%` },
-            { label: '💰 Capacidade de Poupança', score: Math.min(100, poupPct * 5), bench: '≥ 70', desc: `Taxa de poupança: ${poupPct.toFixed(1)}%` },
-            { label: '🌿 Diversificação de Renda', score: Math.min(100, fontes * 35), bench: '≥ 70', desc: `${fontes} fonte(s) de receita` },
-            { label: '🏠 Comprometimento Moradia', score: moradiaPct <= 30 ? 100 : moradiaPct <= 40 ? 70 : 40, bench: '≥ 70', desc: `Moradia: ${moradiaPct.toFixed(1)}% da renda` },
-            { label: '🎉 Gastos Não Obrigatórios', score: opcPct <= 20 ? 100 : opcPct <= 30 ? 70 : 40, bench: '≥ 70', desc: `Opcionais: ${opcPct.toFixed(1)}% da renda` },
-            { label: '🛡️ Segurança Financeira', score: (() => { const e = goals.find(g => g.position === 0); return e && e.target > 0 ? Math.min(100, (e.current_val / e.target) * 100) : 0 })(), bench: '≥ 70', desc: 'Reserva de emergência' },
-          ]
-          const totalScore = Math.round(pillars.reduce((s, p) => s + p.score, 0) / pillars.length)
-          const scoreLabel = totalScore < 40 ? 'Atenção' : totalScore < 60 ? 'Regular' : totalScore < 80 ? 'Bom' : 'Excelente'
-          const scoreColor = totalScore < 40 ? '#ef4444' : totalScore < 60 ? '#f97316' : totalScore < 80 ? '#22c55e' : '#15803d'
-
-          const recs = []
-          if (moradiaPct <= 30) recs.push({ ok: true, text: 'Comprometimento de moradia dentro do ideal' })
-          if (obrigPct <= 50) recs.push({ ok: true, text: `Despesas obrigatórias dentro do limite de 50% (${obrigPct.toFixed(0)}%)` })
-          else recs.push({ ok: false, text: `Despesas obrigatórias acima de 50% (${obrigPct.toFixed(0)}%) — revise os fixos` })
-          if (poupPct >= 20) recs.push({ ok: true, text: `Poupança em ${poupPct.toFixed(0)}% — acima da meta de 20%` })
-          else recs.push({ ok: false, text: `Poupança em ${poupPct.toFixed(0)}% — meta é 10% mínimo (Babilônia) ou 20% (50/30/20)` })
-          if (fontes >= 2) recs.push({ ok: true, text: 'Renda diversificada ✅' })
-          else recs.push({ ok: null, text: 'Considere diversificar fontes de renda' })
-          if (saldo >= 0) recs.push({ ok: true, text: `Saldo positivo de ${R$(saldo)} neste mês` })
-          else recs.push({ ok: false, text: `Saldo negativo de ${R$(Math.abs(saldo))} — despesas acima da receita` })
-
-          return (
-            <div>
-              {/* Header cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                {[
-                  { label: 'RECEITA TOTAL', value: R$(totalInc), color: '#22c55e' },
-                  { label: 'TOTAL DESPESAS', value: R$(totalExp), color: '#ef4444' },
-                  { label: 'SALDO LIVRE', value: R$(saldo), color: saldo >= 0 ? '#22c55e' : '#ef4444' },
-                  { label: '% COMPROMETIDO', value: `${pctComp.toFixed(1)}%`, color: pctComp <= 70 ? '#22c55e' : pctComp <= 90 ? '#f59e0b' : '#ef4444' },
-                ].map(c => (
-                  <div key={c.label} className="stat" style={{ padding: '10px 12px' }}>
-                    <div style={{ fontSize: 10, color: '#64748b', letterSpacing: 1, textTransform: 'uppercase' }}>{c.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: c.color, marginTop: 2 }}>{c.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Score by pillar */}
-              <div className="card">
-                <div className="card-title">🩺 Score Financeiro por Pilar</div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ color: '#64748b', fontSize: 10 }}>
-                        <th style={{ textAlign: 'left', padding: '4px 6px' }}>Pilar</th>
-                        <th style={{ textAlign: 'center', padding: '4px 6px' }}>Score</th>
-                        <th style={{ textAlign: 'center', padding: '4px 6px' }}>Avaliação</th>
-                        <th style={{ textAlign: 'center', padding: '4px 6px' }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pillars.map(p => {
-                        const c = p.score < 40 ? '#ef4444' : p.score < 70 ? '#f59e0b' : '#22c55e'
-                        const lbl = p.score < 40 ? 'Atenção' : p.score < 70 ? 'Regular' : p.score < 90 ? 'Bom' : 'Excelente'
-                        return (
-                          <tr key={p.label} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '8px 6px' }}>
-                              <div style={{ fontWeight: 600 }}>{p.label}</div>
-                              <div style={{ fontSize: 10, color: '#64748b' }}>{p.desc}</div>
-                            </td>
-                            <td style={{ textAlign: 'center', fontWeight: 800, color: c, fontSize: 15 }}>{Math.round(p.score)}</td>
-                            <td style={{ textAlign: 'center', color: c, fontSize: 11 }}>{lbl}</td>
-                            <td style={{ textAlign: 'center', fontSize: 16 }}>{p.score >= 70 ? '✅' : '⚠️'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 800, fontSize: 14 }}>SCORE TOTAL</span>
-                  <span style={{ fontWeight: 800, fontSize: 18, color: scoreColor }}>{totalScore}/100 &nbsp;<span style={{ fontSize: 13 }}>{scoreLabel}</span></span>
-                </div>
-              </div>
-
-              {/* Recomendações */}
-              <div className="card">
-                <div className="card-title">💡 Recomendações Automáticas</div>
-                {recs.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: i < recs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', fontSize: 13 }}>
-                    <span style={{ fontSize: 16, flexShrink: 0 }}>{r.ok === true ? '✅' : r.ok === false ? '⚠️' : '💡'}</span>
-                    <span style={{ color: r.ok === false ? '#f87171' : r.ok === true ? '#86efac' : '#fbbf24' }}>{r.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
+        {subTab === 'diagnostico' && <DiagnosticoTab goals={goals} transactions={transactions} income={income} />}
 
         {/* GASTOS FIXOS */}
         {subTab === 'fixos' && <GastosFixosTabP />}
