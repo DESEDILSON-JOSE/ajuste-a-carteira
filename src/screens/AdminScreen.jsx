@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { AppContext } from '../context/AppContext'
-import { adminAPI } from '../utils/api'
+import { adminAPI, txAPI, goalsAPI, lotsAPI, dreAPI, vplAPI, budgetsAPI } from '../utils/api'
+import { supabase } from '../utils/supabase'
 
 const STATUS_LABEL = { pending: 'Pendente', approved: 'Aprovado', rejected: 'Rejeitado' }
 const STATUS_COLOR = { pending: '#f59e0b', approved: '#22c55e', rejected: '#ef4444' }
@@ -92,12 +93,28 @@ function UserCard({ user, onApprove, onReject }) {
           </button>
         )}
       </div>
+    {/* ZERAR DADOS */}
+      <div style={{ marginTop: 32, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 16, padding: '20px 18px' }}>
+        <h2 style={{ color: '#f87171', fontSize: 16, fontWeight: 700, margin: '0 0 8px 0' }}>⚠️ Zerar meus dados</h2>
+        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 16px 0', lineHeight: 1.6 }}>
+          Apaga <strong style={{ color: '#f87171' }}>permanentemente</strong> todas as suas transações, gastos fixos, lotes de facção, metas, DRE e projetos VPL. Essa ação não pode ser desfeita.
+        </p>
+        <button
+          disabled={resetting}
+          onClick={() => {
+            if (window.confirm('Tem certeza? Isso apaga TODOS os seus dados. Não há como recuperar.')) resetMyData()
+          }}
+          style={{ background: '#ef4444', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, padding: '12px 24px', cursor: resetting ? 'default' : 'pointer', opacity: resetting ? 0.6 : 1, width: '100%' }}
+        >
+          {resetting ? 'Zerando...' : '🗑️ Zerar todos os meus dados'}
+        </button>
+      </div>
     </div>
   )
 }
 
 export default function AdminScreen() {
-  const { addToast } = useContext(AppContext)
+  const { addToast, state, dispatch } = useContext(AppContext)
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('pending')
@@ -124,6 +141,27 @@ export default function AdminScreen() {
     } catch (err) {
       addToast('Erro ao atualizar: ' + err.message, 'error')
     }
+  }
+
+  const [resetting, setResetting] = useState(false)
+
+  const resetMyData = async () => {
+    if (!state?.user?.id) { addToast('Usuário não encontrado', 'error'); return }
+    const uid = state.user.id
+    setResetting(true)
+    try {
+      await supabase.from('transactions').delete().eq('user_id', uid)
+      await supabase.from('goals').delete().eq('user_id', uid)
+      await supabase.from('lots').delete().eq('user_id', uid)
+      await supabase.from('dre_entries').delete().eq('user_id', uid)
+      await supabase.from('vpl_projects').delete().eq('user_id', uid)
+      await supabase.from('budgets').delete().eq('user_id', uid)
+      dispatch({ type: 'RESET_DATA' })
+      addToast('✅ Todos os dados foram zerados!')
+    } catch (err) {
+      addToast('Erro ao zerar: ' + err.message, 'error')
+    }
+    setResetting(false)
   }
 
   const counts = {

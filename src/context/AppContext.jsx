@@ -31,6 +31,7 @@ function reducer(state, action) {
     case 'AUTH_LOADING': return { ...state, authLoading: true }
     case 'AUTH_SUCCESS': return { ...state, authLoading: false, user: action.user }
     case 'AUTH_CLEAR': return { ...initialState, authLoading: false }
+    case 'RESET_DATA': return { ...state, transactions: [], goals: [], lots: [], vplProjects: [], budgets: [], activeLotIdx: 0 }
     case 'SET_PROFILE': return { ...state, profile: action.profile }
     case 'SET_TAB': return { ...state, activeTab: action.tab }
     case 'SET_MODAL': return { ...state, modal: action.modal, editingGoal: action.editingGoal || null }
