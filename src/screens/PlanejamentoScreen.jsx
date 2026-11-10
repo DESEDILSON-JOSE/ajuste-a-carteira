@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { R$, pct, MONTHS } from '../utils/formatters'
-import { monthsToGoal, projectFIRE, calcScore } from '../utils/calculations'
+import { monthsToGoal, projectFIRE } from '../utils/calculations'
 
 
 const FIXOS_CATS = ['Habitação','Alimentação','Supermercado','Açougue','Padaria','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Pet','Assinaturas','Outros']
@@ -351,22 +351,18 @@ export default function PlanejamentoScreen() {
   const fireYears = Math.ceil(fireMonths / 12)
   const fireData = projectFIRE(Number(fireForm.patrimonio), Number(fireForm.aporte), Number(fireForm.taxa), Math.min(fireYears, 40) * 12)
 
-  const score = calcScore(goals, transactions, income)
-  const scoreLabel = score < 300 ? 'Atenção' : score < 500 ? 'Regular' : score < 700 ? 'Bom' : score < 900 ? 'Muito Bom' : 'Excelente'
-  const scoreColor = score < 300 ? '#ef4444' : score < 500 ? '#f97316' : score < 700 ? '#f59e0b' : score < 900 ? '#22c55e' : '#15803d'
-
   const openEdit = (goal) => dispatch({ type: 'SET_MODAL', modal: 'edit-goal', editingGoal: goal })
 
   return (
     <div>
       <div className="hdr hdr-purple">
         <h1>Planejamento Financeiro</h1>
-        <p>Objetivos · Pilares · FIRE · Score</p>
+        <p>Objetivos · Pilares · FIRE · Receita Prevista</p>
       </div>
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12 }}>
-          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['score', 'Score'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos']].map(([id, label]) => (
+          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -555,42 +551,6 @@ export default function PlanejamentoScreen() {
         {/* GASTOS FIXOS */}
         {subTab === 'fixos' && <GastosFixosTabP />}
 
-        {/* SCORE */}
-        {subTab === 'score' && (
-          <div>
-            <div className="card" style={{ textAlign: 'center' }}>
-              <div className="card-title">Score Financeiro</div>
-              <Speedometer score={score} />
-              <div style={{ marginTop: 8 }}>
-                <span className="badge" style={{ background: scoreColor + '22', color: scoreColor, fontSize: 14, padding: '6px 16px' }}>{scoreLabel}</span>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-title">Componentes do Score</div>
-              {[
-                { label: '🛡️ Reserva de Emergência', max: 200, val: (() => { const e = goals.find(g => g.position === 0); return e && e.target > 0 ? Math.min(200, (e.current_val / e.target) * 200) : 0 })() },
-                { label: '💰 Taxa de Poupança', max: 200, val: Math.min(200, (goals.reduce((s, g) => s + (g.monthly || 0), 0) / Math.max(income, 1)) * 10 * 100) },
-                { label: '🎯 Objetivos ativos', max: 100, val: Math.min(100, goals.filter(g => g.current_val > 0).length * 20) },
-                { label: '✅ Sem atrasos', max: 150, val: transactions.filter(t => t.type === 'expense' && !t.paid && t.date < new Date().toISOString().split('T')[0]).length === 0 ? 150 : 0 },
-                { label: '📊 Diversificação', max: 150, val: Math.min(150, goals.length * 30) },
-                { label: '⭐ Base', max: 50, val: 50 },
-                { label: '🏛️ Questão Primordial (poupança ≥10%)', max: 100, val: savingPct >= 10 ? 100 : (savingPct / 10) * 100 },
-                { label: '📌 Controle Fixos (< 70% renda)', max: 100, val: fixosPct <= 70 ? 100 : fixosPct <= 90 ? 50 : 0 },
-              ].map(({ label, max, val }) => (
-                <div key={label} style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                    <span>{label}</span>
-                    <span style={{ fontWeight: 700 }}>{Math.round(val)}/{max}</span>
-                  </div>
-                  <div className="prog">
-                    <div className="prog-fill" style={{ width: `${(val / max) * 100}%`, background: val >= max * 0.7 ? '#22c55e' : val >= max * 0.4 ? '#f59e0b' : '#ef4444' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
