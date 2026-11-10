@@ -329,14 +329,6 @@ export default function DashboardScreen() {
           </div>
         )}
 
-        {/* Dicas inteligentes */}
-        <div className="card" >
-          <div className="card-title">💡 Dicas</div>
-          {tips.map((tip, i) => (
-            <div key={i} style={{ fontSize: 13, color: '#334155', marginBottom: 6, lineHeight: 1.4 }}>{tip}</div>
-          ))}
-        </div>
-
         {/* Atalhos */}
         <div className="g2" style={{ marginBottom: 16 }}>
           <button className="btn btn-green btn-full" onClick={() => { dispatch({ type: 'SET_MODAL', modal: 'add-tx' }); dispatch({ type: 'SET_MODAL_TYPE', modalType: 'income' }) }}>
