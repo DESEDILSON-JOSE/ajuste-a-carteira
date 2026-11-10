@@ -992,6 +992,215 @@ function MinhaContaTab() {
   )
 }
 
+
+// ─── BABILÔNIA ────────────────────────────────────────────
+function BabiloniaTab({ transactions }) {
+  const { state, dispatch, addToast } = useApp()
+  const { profile, user } = state
+  const income = (profile?.income || 0) + parseFloat(localStorage.getItem('businessMonthlyIncome') || '0')
+
+  const partes = { casa: income * 0.7, dividas: income * 0.2, reserva: income * 0.1 }
+
+  const mediaMensal = useMemo(() => {
+    const now = new Date()
+    let total = 0, count = 0
+    for (let i = 0; i < 12; i++) {
+      let m = now.getMonth() + 1 - i, y = now.getFullYear()
+      if (m <= 0) { m += 12; y-- }
+      const exp = transactions
+        .filter(t => { const d = new Date(t.date + 'T12:00:00'); return t.type === 'expense' && d.getMonth() + 1 === m && d.getFullYear() === y })
+        .reduce((s, t) => s + t.value, 0)
+      if (exp > 0) { total += exp; count++ }
+    }
+    return count > 0 ? total / count : 0
+  }, [transactions])
+
+  const metaReserva = mediaMensal * 6
+
+  const [reservaAtual, setReservaAtual] = React.useState(() => profile?.reserva_atual || 0)
+  const [temDividas, setTemDividas] = React.useState(() => profile?.tem_dividas || false)
+  const [saving, setSaving] = React.useState(false)
+
+  const gastosMes = useMemo(() => {
+    const now = new Date()
+    return transactions
+      .filter(t => { const d = new Date(t.date + 'T12:00:00'); return t.type === 'expense' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() })
+      .reduce((s, t) => s + t.value, 0)
+  }, [transactions])
+
+  const pctCasa = partes.casa > 0 ? Math.min(100, (gastosMes / partes.casa) * 100) : 0
+  const colorCasa = pctCasa >= 100 ? '#ef4444' : pctCasa >= 80 ? '#f59e0b' : '#22c55e'
+  const reservaNum = parseFloat(reservaAtual) || 0
+  const pctReserva = metaReserva > 0 ? Math.min(100, (reservaNum / metaReserva) * 100) : 0
+
+  const saveData = async () => {
+    setSaving(true)
+    try {
+      const updated = { ...profile, reserva_atual: reservaNum, tem_dividas: temDividas }
+      await profileAPI.update(user.id, updated)
+      dispatch({ type: 'SET_PROFILE', profile: updated })
+      addToast('Dados salvos!')
+    } catch { addToast('Erro ao salvar', 'error') }
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      {/* Cabeçalho */}
+      <div className="card" style={{ background: 'linear-gradient(135deg,rgba(234,179,8,.18),rgba(161,117,0,.10))', border: '1px solid rgba(234,179,8,.3)' }}>
+        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏛️ Método da Babilônia</div>
+        <div style={{ fontSize: 12, color: '#fbbf24', fontStyle: 'italic' }}>
+          "Uma parte de tudo que você ganha é sua para guardar."
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+          George S. Clason — O Homem Mais Rico da Babilônia
+        </div>
+      </div>
+
+      {/* Divisão das 10 partes */}
+      <div className="card">
+        <div className="card-title">⚖️ Divisão das 10 Partes</div>
+        {income === 0 && (
+          <div style={{ fontSize: 12, color: '#fbbf24', marginBottom: 10 }}>
+            ⚠️ Configure sua renda em Minha Conta para ativar os cálculos.
+          </div>
+        )}
+        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+          Renda mensal: <strong style={{ color: '#4ade80', fontSize: 15 }}>{R$(income)}</strong>
+        </div>
+
+        {/* 7/10 Casa */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 22 }}>🏠</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>7/10 — Casa</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>gastos de vida (70%)</div>
+              </div>
+            </div>
+            <span style={{ fontWeight: 800, color: '#60a5fa', fontSize: 15 }}>{R$(partes.casa)}</span>
+          </div>
+          <div className="prog">
+            <div className="prog-fill" style={{ width: `${pctCasa}%`, background: colorCasa, transition: 'width .4s' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginTop: 3 }}>
+            <span>Gasto este mês: {R$(gastosMes)}</span>
+            <span style={{ color: colorCasa, fontWeight: 600 }}>{pctCasa.toFixed(0)}%</span>
+          </div>
+        </div>
+
+        {/* 2/10 Dívidas/Negócio */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 22 }}>{temDividas ? '💸' : '💼'}</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>2/10 — {temDividas ? 'Dívidas' : 'Investimento Negócio'}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>{temDividas ? 'quitar dívidas (20%)' : 'guia de investimento (20%)'}</div>
+              </div>
+            </div>
+            <span style={{ fontWeight: 800, color: temDividas ? '#f87171' : '#a78bfa', fontSize: 15 }}>{R$(partes.dividas)}</span>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8', cursor: 'pointer' }}>
+            <input type="checkbox" checked={temDividas} onChange={e => setTemDividas(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f87171' }} />
+            Tenho dívidas a quitar
+          </label>
+          {!temDividas && (
+            <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 6, padding: '6px 10px', background: 'rgba(167,139,250,.1)', borderRadius: 8 }}>
+              💡 Sem dívidas? Destine {R$(partes.dividas)} como guia de investimento no negócio este mês.
+            </div>
+          )}
+        </div>
+
+        {/* 1/10 Reserva */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 22 }}>🛡️</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>1/10 — Reserva de Emergência</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>poupança mensal (10%)</div>
+              </div>
+            </div>
+            <span style={{ fontWeight: 800, color: '#34d399', fontSize: 15 }}>{R$(partes.reserva)}</span>
+          </div>
+        </div>
+
+        <button className="btn btn-dark btn-full" onClick={saveData} disabled={saving}>
+          {saving ? 'Salvando...' : 'Salvar configurações'}
+        </button>
+      </div>
+
+      {/* Reserva de emergência */}
+      <div className="card">
+        <div className="card-title">🛡️ Reserva de Emergência</div>
+        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14, lineHeight: 1.7 }}>
+          Meta: <strong style={{ color: '#f8fafc' }}>6 meses</strong> de gastos médios<br />
+          Média mensal (últimos 12m): <strong style={{ color: '#f8fafc' }}>{R$(mediaMensal)}</strong><br />
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#34d399' }}>Meta total: {R$(metaReserva)}</span>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="label">Reserva acumulada até hoje (R$)</label>
+          <input
+            className="input"
+            type="number"
+            inputMode="decimal"
+            value={reservaAtual}
+            onChange={e => setReservaAtual(e.target.value)}
+            placeholder="0,00"
+          />
+        </div>
+
+        <div className="prog" style={{ marginBottom: 6 }}>
+          <div className="prog-fill" style={{ width: `${pctReserva}%`, background: pctReserva >= 100 ? '#22c55e' : '#3b82f6', transition: 'width .5s' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8' }}>
+          <span>{R$(reservaNum)} acumulado</span>
+          <span style={{ color: pctReserva >= 100 ? '#22c55e' : '#60a5fa', fontWeight: 700 }}>{pctReserva.toFixed(0)}% da meta</span>
+        </div>
+
+        {pctReserva >= 100 ? (
+          <div style={{ marginTop: 12, fontSize: 13, color: '#4ade80', fontWeight: 700, padding: '10px 12px', background: 'rgba(34,197,94,.1)', borderRadius: 10 }}>
+            🎉 Reserva completa! Os 10% mensais podem migrar para investimentos.
+          </div>
+        ) : metaReserva > 0 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#94a3b8' }}>
+            Faltam <strong style={{ color: '#f8fafc' }}>{R$(metaReserva - reservaNum)}</strong> · estimativa: ~{Math.ceil((metaReserva - reservaNum) / Math.max(partes.reserva, 1))} meses
+          </div>
+        )}
+
+        <button className="btn btn-dark btn-full" onClick={saveData} disabled={saving} style={{ marginTop: 14 }}>
+          {saving ? 'Salvando...' : 'Salvar reserva'}
+        </button>
+      </div>
+
+      {/* As 7 Curas */}
+      <div className="card">
+        <div className="card-title">📜 As 7 Curas para uma Bolsa Magra</div>
+        {[
+          ['1ª', '💰 Pague a si mesmo primeiro', 'Guarde 1/10 de tudo que ganhar antes de qualquer gasto.'],
+          ['2ª', '📋 Controle seus gastos', 'Faça um orçamento. Diferencie necessidades de desejos.'],
+          ['3ª', '📈 Faça o dinheiro trabalhar', 'Invista as economias para gerar renda adicional.'],
+          ['4ª', '🛡️ Proteja seus investimentos', 'Certifique-se da segurança do capital. Entenda os riscos.'],
+          ['5ª', '🏠 Tenha casa própria', 'Invista em propriedades para estabilidade e redução de custos.'],
+          ['6ª', '👴 Prepare sua aposentadoria', 'Estabeleça reservas para a velhice e proteção da família.'],
+          ['7ª', '🧠 Melhore suas habilidades', 'Aprimore sua capacidade de ganhar mais.'],
+        ].map(([num, title, desc]) => (
+          <div key={num} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+            <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 800, minWidth: 28, paddingTop: 2 }}>{num}</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN ────────────────────────────────────────────────────
 export default function RelatoriosScreen() {
   const { state, dispatch } = useApp()
@@ -1007,11 +1216,12 @@ export default function RelatoriosScreen() {
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {[['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
+          {[['babilonia', '🏛️ Babilônia'], ['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} style={{ flex: 'none', minWidth: 'max-content', padding: '9px 12px' }} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
 
+        {subTab === 'babilonia' && <BabiloniaTab transactions={transactions} />}
         {subTab === '7dias' && <SevenDaysTab transactions={transactions} />}
         {subTab === 'mensal' && <MensalTab transactions={transactions} />}
         {subTab === 'anual' && <AnualTab transactions={transactions} />}
