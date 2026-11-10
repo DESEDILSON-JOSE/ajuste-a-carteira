@@ -358,7 +358,7 @@ export default function PlanejamentoScreen() {
     <div>
       <div className="hdr hdr-purple">
         <h1>Planejamento Financeiro</h1>
-        <p>Objetivos · Pilares · FIRE · Receita Prevista</p>
+        <p>Objetivos · Pilares · FIRE · Diagnóstico · Fixos</p>
       </div>
 
       <div style={{ padding: '0 16px' }}>
@@ -556,4 +556,3 @@ export default function PlanejamentoScreen() {
     </div>
   )
 }
-test
