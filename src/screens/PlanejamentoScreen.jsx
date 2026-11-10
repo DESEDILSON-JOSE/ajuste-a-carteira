@@ -1,8 +1,173 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { R$, pct, MONTHS } from '../utils/formatters'
 import { monthsToGoal, projectFIRE, calcScore } from '../utils/calculations'
+
+
+const FIXOS_CATS = ['Habitação','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Outros']
+const FIXOS_ICONS = {'Habitação':'🏠','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Outros':'📌'}
+
+function GastosFixosTabP() {
+  const { state, addFixo, deleteRecurringGroup, updateFixo } = useApp()
+  const [form, setForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5 })
+  const [showForm, setShowForm] = React.useState(false)
+  const [editingFixo, setEditingFixo] = React.useState(null)
+  const [editForm, setEditForm] = React.useState({ description: '', value: '', category: 'Habitação', dueDay: 5 })
+  const [saving, setSaving] = React.useState(false)
+
+  const fixos = React.useMemo(() => {
+    const groups = {}
+    state.transactions.filter(t => t.recurring && t.type === 'expense').forEach(t => {
+      if (!groups[t.recurring_id]) {
+        const d = new Date(t.date + 'T12:00:00')
+        groups[t.recurring_id] = {
+          recurring_id: t.recurring_id,
+          description: t.description,
+          value: t.value,
+          category: t.category,
+          dueDay: d.getDate(),
+        }
+      }
+    })
+    return Object.values(groups)
+  }, [state.transactions])
+
+  const total = fixos.reduce((s, f) => s + f.value, 0)
+  const totalAnual = total * 12
+
+  const handleSave = async () => {
+    if (!form.description || !form.value) return
+    setSaving(true)
+    await addFixo({ ...form, value: parseFloat(form.value) })
+    setSaving(false)
+    setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 })
+    setShowForm(false)
+  }
+
+  const startEdit = (f) => {
+    setEditingFixo(f)
+    setEditForm({ description: f.description, value: String(f.value), category: f.category, dueDay: f.dueDay })
+  }
+
+  const handleUpdate = async () => {
+    if (!editForm.value) return
+    setSaving(true)
+    await updateFixo(editingFixo.recurring_id, { ...editForm, value: parseFloat(editForm.value) })
+    setSaving(false)
+    setEditingFixo(null)
+  }
+
+  const remove = (rid) => deleteRecurringGroup(rid)
+
+  return (
+    <div>
+      <div className="g2" style={{ marginBottom: 12 }}>
+        <div className="stat">
+          <div className="stat-label">Total Mensal</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Total Anual</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R}</div>
+        </div>
+      </div>
+
+      {fixos.length > 0 && (
+        <div className="card">
+          {fixos.map(f => (
+            <div key={f.recurring_id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: editingFixo?.recurring_id === f.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · dia {f.dueDay} · todos os meses</div>
+                </div>
+                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R}</span>
+                <button onClick={() => editingFixo?.recurring_id === f.recurring_id ? setEditingFixo(null) : startEdit(f)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
+                <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}>🗑</button>
+              </div>
+              {editingFixo?.recurring_id === f.recurring_id && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 11, color: '#60a5fa', marginBottom: 2 }}>✏️ Atualiza apenas meses a partir de hoje</div>
+                  <div>
+                    <label className="label">Descrição</label>
+                    <input className="input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+                  </div>
+                  <div className="g2">
+                    <div>
+                      <label className="label">Novo valor (R$)</label>
+                      <input className="input" type="number" inputMode="decimal" value={editForm.value} onChange={e => setEditForm(f => ({ ...f, value: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="label">Vence dia</label>
+                      <input className="input" type="number" min="1" max="31" value={editForm.dueDay} onChange={e => setEditForm(f => ({ ...f, dueDay: parseInt(e.target.value) || 1 }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Categoria</label>
+                    <select className="input" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
+                      {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="g2">
+                    <button className="btn btn-ghost btn-full" onClick={() => setEditingFixo(null)}>Cancelar</button>
+                    <button className="btn btn-dark btn-full" onClick={handleUpdate} disabled={saving}>{saving ? 'Salvando...' : 'Atualizar'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm ? (
+        <div className="card">
+          <div className="card-title">Novo Gasto Fixo</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label className="label">Descrição</label>
+              <input className="input" placeholder="Ex: Aluguel, Internet..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="g2">
+              <div>
+                <label className="label">Valor (R$)</label>
+                <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Vence dia</label>
+                <input className="input" type="number" min="1" max="31" value={form.dueDay} onChange={e => setForm(f => ({ ...f, dueDay: parseInt(e.target.value) || 1 }))} />
+              </div>
+            </div>
+            <div>
+              <label className="label">Categoria</label>
+              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 12, color: '#60a5fa', padding: '4px 0' }}>
+              📅 Serão criadas despesas para todos os 12 meses do ano automaticamente.
+            </div>
+            <div className="g2">
+              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 }) }}>Cancelar</button>
+              <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Gasto Fixo</button>
+      )}
+
+      {fixos.length === 0 && !showForm && (
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--cinza)' }}>
+          <div style={{ fontSize: 40 }}>🏷️</div>
+          <div style={{ marginTop: 8 }}>Nenhum gasto fixo cadastrado</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Gastos fixos aparecem automaticamente em todos os meses</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const PILARES = [
   { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação', 'Habitação', 'Transporte e Comunicação', 'Saúde e Cuidados'] },
@@ -67,7 +232,7 @@ export default function PlanejamentoScreen() {
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12 }}>
-          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['score', 'Score']].map(([id, label]) => (
+          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['score', 'Score'], ['fixos', '🏷️ Fixos']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -209,6 +374,9 @@ export default function PlanejamentoScreen() {
             </div>
           </div>
         )}
+
+        {/* GASTOS FIXOS */}
+        {subTab === 'fixos' && <GastosFixosTabP />}
 
         {/* SCORE */}
         {subTab === 'score' && (

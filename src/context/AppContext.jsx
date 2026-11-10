@@ -189,10 +189,37 @@ export function AppProvider({ children }) {
 
   const addTx = async (tx) => {
     try {
-      const newTx = { ...tx, user_id: state.user.id }
-      const saved = await txAPI.add(newTx)
-      dispatch({ type: 'ADD_TX', tx: saved })
-      addToast('Transação salva!')
+      const isCredit = tx.account === 'Cartão de Crédito'
+      const installments = isCredit && tx.installments > 1 ? tx.installments : 1
+      if (installments > 1) {
+        // Divide o valor e distribui parcelas nos meses seguintes
+        const parcVal = Math.round((tx.value / installments) * 100) / 100
+        const rid = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36))
+        const baseDate = new Date(tx.date + 'T12:00:00')
+        for (let i = 0; i < installments; i++) {
+          const d = new Date(baseDate)
+          d.setMonth(d.getMonth() + i)
+          const dateStr = d.toISOString().split('T')[0]
+          const parcelaTx = {
+            ...tx,
+            user_id: state.user.id,
+            value: parcVal,
+            date: dateStr,
+            description: `${tx.description} (${i + 1}/${installments})`,
+            installments: installments,
+            installment_index: i + 1,
+            installment_group_id: rid,
+          }
+          const saved = await txAPI.add(parcelaTx)
+          dispatch({ type: 'ADD_TX', tx: saved })
+        }
+        addToast(`${installments}x parcelas salvas!`)
+      } else {
+        const newTx = { ...tx, user_id: state.user.id }
+        const saved = await txAPI.add(newTx)
+        dispatch({ type: 'ADD_TX', tx: saved })
+        addToast('Transação salva!')
+      }
     } catch (err) { addToast(err.message, 'error') }
   }
 
