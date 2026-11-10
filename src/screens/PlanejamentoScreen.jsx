@@ -5,8 +5,8 @@ import { R$, pct, MONTHS } from '../utils/formatters'
 import { monthsToGoal, projectFIRE, calcScore } from '../utils/calculations'
 
 
-const FIXOS_CATS = ['Habitação','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Outros']
-const FIXOS_ICONS = {'Habitação':'🏠','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Outros':'📌'}
+const FIXOS_CATS = ['Habitação','Alimentação','Supermercado','Açougue','Padaria','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Pet','Assinaturas','Outros']
+const FIXOS_ICONS = {'Habitação':'🏠','Alimentação':'🍽️','Supermercado':'🛒','Açougue':'🥩','Padaria':'🥖','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Pet':'🐾','Assinaturas':'📱','Outros':'📌'}
 
 function GastosFixosTabP() {
   const { state, addFixo, deleteRecurringGroup, updateFixo } = useApp()
@@ -65,11 +65,11 @@ function GastosFixosTabP() {
       <div className="g2" style={{ marginBottom: 12 }}>
         <div className="stat">
           <div className="stat-label">Total Mensal</div>
-          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R}</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R$(total)}</div>
         </div>
         <div className="stat">
           <div className="stat-label">Total Anual</div>
-          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R}</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#ef4444' }}>{R$(totalAnual)}</div>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ function GastosFixosTabP() {
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
                   <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · dia {f.dueDay} · todos os meses</div>
                 </div>
-                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R}</span>
+                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(f.value)}</span>
                 <button onClick={() => editingFixo?.recurring_id === f.recurring_id ? setEditingFixo(null) : startEdit(f)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
                 <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}>🗑</button>
               </div>
