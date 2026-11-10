@@ -59,6 +59,9 @@ export default function TransacoesScreen() {
     if (window.confirm(msg)) deleteTx(t.id)
   }
 
+  const [editingTxId, setEditingTxId] = useState(null)
+  const [editValue, setEditValue] = useState('')
+
   const curYM = currentYearMonth()
 
   return (
@@ -198,9 +201,24 @@ export default function TransacoesScreen() {
                         color: isInc ? '#4ade80' : isPaid ? '#4ade80' : '#f87171' }}>
                       {isInc ? '✓ recebido' : isPaid ? '✓ pago' : isCredit ? '● fatura' : '● pagar'}
                     </button>
-                    <div className={'tx-value ' + (isInc ? 'income' : 'expense')} style={{ fontSize: 14 }}>
-                      {isInc ? '+' : '-'}{R$(t.value)}
-                    </div>
+                    {editingTxId === t.id ? (
+                      <>
+                        <input type="number" inputMode="decimal" value={editValue} autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { updateTx(t.id, { value: parseFloat(editValue) || t.value }); setEditingTxId(null) } if (e.key === 'Escape') setEditingTxId(null) }}
+                          style={{ width: 72, fontSize: 13, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', textAlign: 'right' }} />
+                        <button onClick={() => { updateTx(t.id, { value: parseFloat(editValue) || t.value }); setEditingTxId(null) }}
+                          style={{ background: 'rgba(74,222,128,0.2)', border: 'none', borderRadius: 6, color: '#4ade80', padding: '4px 8px', cursor: 'pointer', fontSize: 14 }}>✓</button>
+                      </>
+                    ) : (
+                      <>
+                        <div className={'tx-value ' + (isInc ? 'income' : 'expense')} style={{ fontSize: 14 }}>
+                          {isInc ? '+' : '-'}{R$(t.value)}
+                        </div>
+                        <button onClick={() => { setEditingTxId(t.id); setEditValue(String(t.value)) }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#64748b', padding: 2 }} title="Reajustar valor">✏️</button>
+                      </>
+                    )}
                     <button onClick={() => handleDelete(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#94a3b8', padding: 4 }}>🗑</button>
                   </div>
                 </div>
