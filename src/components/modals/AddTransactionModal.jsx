@@ -8,24 +8,15 @@ const TYPES = [
   { id: 'transfer', label: 'Transferência', color: '#3b82f6' },
 ]
 
-const SPENDING_TYPES = [
-  { id: 'essencial', icon: '🏠', label: 'Essências', sub: 'Anual (12×)', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
-  { id: 'necessario', icon: '🛒', label: 'Necessário', sub: 'Parcelável', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
-  { id: 'util', icon: '🔧', label: 'Úteis', sub: 'Parcelável', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-  { id: 'desnecessario', icon: '⚠️', label: 'Desnecessário', sub: 'Parcelável', color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
-]
-
 const PARCELAS = Array.from({ length: 24 }, (_, i) => i + 1)
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 export default function AddTransactionModal() {
-  const { dispatch, addTx, addToast, state } = useApp()
+  const { dispatch, addTx, state } = useApp()
   const [type, setType] = useState('expense')
-  const [spendingType, setSpendingType] = useState(null)
   const [form, setForm] = useState({
     description: '', value: '', date: todayStr(),
     category: 'Alimentação', account: 'Dinheiro', paid: true, notes: '',
-    installments: 1, spendingInstallments: 1, person: '',
+    installments: 1, person: '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -36,8 +27,6 @@ export default function AddTransactionModal() {
   const isCredit = form.account === 'Cartão de Crédito'
   const parcVal = form.value && form.installments > 1 && isCredit
     ? form.installments + 'x de ' + R$(parseFloat(form.value) / form.installments)
-    : form.value && form.spendingInstallments > 1 && spendingType && spendingType !== 'essencial'
-    ? form.spendingInstallments + 'x de ' + R$(parseFloat(form.value) / form.spendingInstallments) + '/mês'
     : ''
 
   const members = state.profile?.members || []
@@ -45,75 +34,7 @@ export default function AddTransactionModal() {
   const handleSave = async () => {
     if (!form.value || !form.description) return
     setLoading(true)
-
     const baseVal = parseFloat(form.value) || 0
-
-    // Essências = lança 12 meses recorrentes
-    if (type === 'expense' && spendingType === 'essencial') {
-      const year = new Date().getFullYear()
-      const rid = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2)
-      let ok = 0
-      for (let m = 0; m < 12; m++) {
-        const day = Math.min(parseInt(form.date.split('-')[2]) || 7, DAYS_IN_MONTH[m])
-        const date = year + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
-        try {
-          await addTx({
-            type: 'expense',
-            description: form.description,
-            value: baseVal,
-            date,
-            category: form.category,
-            account: form.account,
-            paid: false,
-            notes: form.notes || 'Essência fixa',
-            recurring: true,
-            recurring_id: rid,
-            spending_type: 'essencial',
-            person: form.person || null,
-          })
-          ok++
-        } catch (_) {}
-      }
-      addToast(ok === 12 ? form.description + ': 12 meses lançados!' : ok + '/12 lançamentos criados', ok === 12 ? 'success' : 'error')
-      setLoading(false)
-      close()
-      return
-    }
-
-    // Necessário/Úteis/Desnecessário com parcelamento por meses
-    if (type === 'expense' && spendingType && spendingType !== 'essencial' && form.spendingInstallments > 1) {
-      const n = form.spendingInstallments
-      const baseDate = new Date(form.date + 'T12:00:00')
-      let ok = 0
-      for (let m = 0; m < n; m++) {
-        const d = new Date(baseDate)
-        d.setMonth(d.getMonth() + m)
-        const dateStr = d.toISOString().split('T')[0]
-        try {
-          await addTx({
-            type: 'expense',
-            description: form.description + ' (' + (m+1) + '/' + n + ')',
-            value: Math.round((baseVal / n) * 100) / 100,
-            date: dateStr,
-            category: form.category,
-            account: form.account,
-            paid: m === 0 ? form.paid : false,
-            notes: form.notes,
-            spending_type: spendingType,
-            person: form.person || null,
-          })
-          ok++
-        } catch(_) {}
-      }
-      addToast(form.description + ': ' + ok + '/' + n + ' meses lançados!', ok === n ? 'success' : 'error')
-      setLoading(false)
-      close()
-      return
-    }
-
-    // Lançamento único
     await addTx({
       type,
       description: form.description,
@@ -125,14 +46,13 @@ export default function AddTransactionModal() {
       notes: form.notes,
       installments: isCredit ? form.installments : 1,
       person: form.person || null,
-      spending_type: type === 'expense' ? spendingType : null,
+      spending_type: null,
     })
     setLoading(false)
     close()
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const selectedST = SPENDING_TYPES.find(s => s.id === spendingType)
 
   return (
     <div className="overlay" onClick={close}>
@@ -146,7 +66,6 @@ export default function AddTransactionModal() {
               style={type === t.id ? { background: t.color } : {}}
               onClick={() => {
                 setType(t.id)
-                setSpendingType(null)
                 set('category', t.id === 'income' ? 'Trabalho' : 'Alimentação')
               }}>
               {t.label}
@@ -172,40 +91,6 @@ export default function AddTransactionModal() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* Classificação de despesa — chips compactos */}
-          {type === 'expense' && (
-            <div>
-              <label className="label">Classificar como</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {SPENDING_TYPES.map(st => {
-                  const active = spendingType === st.id
-                  return (
-                    <button key={st.id}
-                      onClick={() => setSpendingType(prev => prev === st.id ? null : st.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 5,
-                        background: active ? st.bg : 'rgba(255,255,255,0.05)',
-                        border: '1.5px solid ' + (active ? st.color : 'rgba(255,255,255,0.1)'),
-                        borderRadius: 20, padding: '5px 12px', cursor: 'pointer',
-                        fontSize: 12, fontWeight: active ? 700 : 400,
-                        color: active ? st.color : '#94a3b8',
-                        transition: 'all 0.15s',
-                      }}>
-                      <span>{st.icon}</span>
-                      <span>{st.label}</span>
-                      {active && <span style={{ fontSize: 10, opacity: 0.8 }}>· {st.sub}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {spendingType === 'essencial' && (
-                <div style={{ marginTop: 8, fontSize: 11, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', borderRadius: 8, padding: '6px 10px' }}>
-                  🏠 Vai criar 12 lançamentos mensais para {new Date().getFullYear()} automaticamente
-                </div>
-              )}
-            </div>
-          )}
-
           <div>
             <label className="label">Descrição</label>
             <input className="input" placeholder="Ex: Supermercado" value={form.description} onChange={e => set('description', e.target.value)} />
@@ -224,7 +109,6 @@ export default function AddTransactionModal() {
             </div>
           </div>
 
-          {/* Parcelas cartão de crédito */}
           {isCredit && type === 'expense' && (
             <div>
               <label className="label">Parcelas (cartão)</label>
@@ -260,7 +144,7 @@ export default function AddTransactionModal() {
             </div>
           )}
 
-          {type === 'expense' && spendingType !== 'essencial' && (
+          {type === 'expense' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
               <input type="checkbox" checked={form.paid} onChange={e => set('paid', e.target.checked)} style={{ width: 16, height: 16 }} />
               Já foi pago
@@ -275,7 +159,7 @@ export default function AddTransactionModal() {
           <div className="g2" style={{ marginTop: 4 }}>
             <button className="btn btn-ghost btn-full" onClick={close}>Cancelar</button>
             <button className="btn btn-dark btn-full" onClick={handleSave} disabled={loading}>
-              {loading ? 'Salvando...' : spendingType === 'essencial' ? '💾 Salvar 12 meses' : form.spendingInstallments > 1 ? '💾 Salvar ' + form.spendingInstallments + 'x' : 'Salvar'}
+              {loading ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>
