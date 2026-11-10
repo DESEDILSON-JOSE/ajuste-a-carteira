@@ -95,7 +95,7 @@ function MensalTab({ transactions }) {
     setSelM(m); setSelY(y)
   }
 
-  const { monthTxs, prevTxs, inc, exp, byCategory } = useMemo(() => {
+  const { monthTxs, prevTxs, inc, exp, byCategory, byAccount } = useMemo(() => {
     const monthTxs = transactions.filter(t => {
       const d = new Date(t.date + 'T12:00:00')
       return d.getMonth() + 1 === selM && d.getFullYear() === selY
@@ -112,7 +112,14 @@ function MensalTab({ transactions }) {
     monthTxs.filter(t => t.type === 'expense').forEach(t => {
       byCategory[t.category] = (byCategory[t.category] || 0) + t.value
     })
-    return { monthTxs, prevTxs, inc, exp, byCategory }
+    const byAccount = {}
+    monthTxs.forEach(t => {
+      const acc = t.account || 'Dinheiro'
+      if (!byAccount[acc]) byAccount[acc] = { inc: 0, exp: 0 }
+      if (t.type === 'income') byAccount[acc].inc += t.value
+      else if (t.type === 'expense') byAccount[acc].exp += t.value
+    })
+    return { monthTxs, prevTxs, inc, exp, byCategory, byAccount }
   }, [transactions, selM, selY])
 
   const prevExp = prevTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0)
@@ -161,6 +168,32 @@ function MensalTab({ transactions }) {
         </div>
       )}
 
+      {Object.keys(byAccount).length > 0 && (
+        <div className="card">
+          <div className="card-title">💳 Por Tipo de Pagamento</div>
+          <div className="scroll-x">
+            <table className="tbl">
+              <thead><tr><th>Conta</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead>
+              <tbody>
+                {Object.entries(byAccount)
+                  .sort((a, b) => (b[1].exp + b[1].inc) - (a[1].exp + a[1].inc))
+                  .map(([acc, data]) => {
+                    const saldo = data.inc - data.exp
+                    return (
+                      <tr key={acc}>
+                        <td>{ACCOUNT_ICON[acc] || '💳'} {acc}</td>
+                        <td style={{ color: '#15803d' }}>{R$(data.inc)}</td>
+                        <td style={{ color: '#dc2626' }}>{R$(data.exp)}</td>
+                        <td style={{ fontWeight: 600, color: saldo >= 0 ? '#15803d' : '#dc2626' }}>{R$(saldo)}</td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <button className="btn btn-ghost btn-full" onClick={() => window.print()}>🖨️ Imprimir</button>
     </div>
   )
@@ -170,7 +203,7 @@ function MensalTab({ transactions }) {
 function AnualTab({ transactions }) {
   const [selY, setSelY] = useState(new Date().getFullYear())
 
-  const { monthlyData, totals } = useMemo(() => {
+  const { monthlyData, totals, byAccount } = useMemo(() => {
     const monthlyData = MONTHS.map((m, mi) => {
       const txs = transactions.filter(t => {
         const d = new Date(t.date + 'T12:00:00')
@@ -187,7 +220,14 @@ function AnualTab({ transactions }) {
       avgInc: activeMonths.length > 0 ? monthlyData.reduce((s, m) => s + m.receita, 0) / Math.max(activeMonths.length, 1) : 0,
       avgExp: activeMonths.length > 0 ? monthlyData.reduce((s, m) => s + m.despesa, 0) / Math.max(activeMonths.length, 1) : 0,
     }
-    return { monthlyData, totals }
+    const byAccount = {}
+    transactions.filter(t => new Date(t.date + 'T12:00:00').getFullYear() === selY).forEach(t => {
+      const acc = t.account || 'Dinheiro'
+      if (!byAccount[acc]) byAccount[acc] = { inc: 0, exp: 0 }
+      if (t.type === 'income') byAccount[acc].inc += t.value
+      else if (t.type === 'expense') byAccount[acc].exp += t.value
+    })
+    return { monthlyData, totals, byAccount }
   }, [transactions, selY])
 
   const bestMonth = monthlyData.reduce((best, m) => m.saldo > (best?.saldo || -Infinity) ? m : best, null)
@@ -271,6 +311,32 @@ function AnualTab({ transactions }) {
               <span style={{ fontWeight: 700, color: '#dc2626' }}>{R$(t.value)}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {Object.keys(byAccount).length > 0 && (
+        <div className="card">
+          <div className="card-title">💳 Por Tipo de Pagamento</div>
+          <div className="scroll-x">
+            <table className="tbl">
+              <thead><tr><th>Conta</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead>
+              <tbody>
+                {Object.entries(byAccount)
+                  .sort((a, b) => (b[1].exp + b[1].inc) - (a[1].exp + a[1].inc))
+                  .map(([acc, data]) => {
+                    const saldo = data.inc - data.exp
+                    return (
+                      <tr key={acc}>
+                        <td>{ACCOUNT_ICON[acc] || '💳'} {acc}</td>
+                        <td style={{ color: '#15803d' }}>{R$(data.inc)}</td>
+                        <td style={{ color: '#dc2626' }}>{R$(data.exp)}</td>
+                        <td style={{ fontWeight: 600, color: saldo >= 0 ? '#15803d' : '#dc2626' }}>{R$(saldo)}</td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
