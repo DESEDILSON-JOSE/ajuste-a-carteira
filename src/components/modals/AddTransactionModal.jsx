@@ -42,7 +42,7 @@ export default function AddTransactionModal() {
       date: form.date,
       category: form.category,
       account: form.account,
-      paid: type === 'income' ? true : form.paid,
+      paid: type === 'income' ? true : (isCredit ? false : form.paid),
       notes: form.notes,
       installments: isCredit ? form.installments : 1,
       person: form.person || null,
@@ -103,7 +103,10 @@ export default function AddTransactionModal() {
             </div>
             <div>
               <label className="label">Conta</label>
-              <select className="input" value={form.account} onChange={e => set('account', e.target.value)}>
+              <select className="input" value={form.account} onChange={e => {
+                const acc = e.target.value
+                setForm(f => ({ ...f, account: acc, paid: acc === 'Cartão de Crédito' ? false : f.paid }))
+              }}>
                 {ACCOUNTS.map(a => <option key={a}>{a}</option>)}
               </select>
             </div>
@@ -145,10 +148,16 @@ export default function AddTransactionModal() {
           )}
 
           {type === 'expense' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.paid} onChange={e => set('paid', e.target.checked)} style={{ width: 16, height: 16 }} />
-              Já foi pago
-            </label>
+            isCredit ? (
+              <div style={{ fontSize: 12, color: '#f87171', background: 'rgba(248,113,113,0.1)', borderRadius: 8, padding: '8px 10px' }}>
+                💳 Cartão de Crédito — aparece como <strong>pendente</strong> até você marcar como pago na fatura
+              </div>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.paid} onChange={e => set('paid', e.target.checked)} style={{ width: 16, height: 16 }} />
+                Já foi pago
+              </label>
+            )
           )}
 
           <div>

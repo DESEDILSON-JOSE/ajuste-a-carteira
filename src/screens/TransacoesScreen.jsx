@@ -159,26 +159,45 @@ export default function TransacoesScreen() {
         ) : grouped.map(([date, txs]) => (
           <div key={date}>
             <div className="date-group-label">{fmtDateFull(date)}</div>
-            {txs.map(t => (
-              <div key={t.id} className="tx-item">
-                <button className="tx-avatar" title="Alternar pago" onClick={() => updateTx(t.id, { paid: !t.paid })}>
-                  {CAT_ICON[t.category] || '📌'}
-                </button>
-                <div className="tx-info">
-                  <div className="tx-desc" style={{ opacity: t.type === 'expense' && !t.paid ? .6 : 1 }}>{t.description}</div>
-                  <div className="tx-sub">
-                    {t.category} · {t.account}
-                    {t.type === 'expense' && !t.paid && <span className="badge badge-orange" style={{ marginLeft: 4 }}>pendente</span>}
+            {txs.map(t => {
+              const isExp = t.type === 'expense'
+              const isInc = t.type === 'income'
+              const isCredit = t.account === 'Cartão de Crédito'
+              // Cartão de crédito: sempre vermelho até marcar como pago na fatura
+              const isPaid = t.paid && true
+              const showRed = isExp && (!isPaid || isCredit && !isPaid)
+              const showGreen = isInc || (isExp && isPaid)
+              const borderColor = showGreen ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.5)'
+              const bgColor = showGreen ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.07)'
+              return (
+                <div key={t.id} className="tx-item" style={{ borderLeft: '3px solid ' + borderColor, background: bgColor, borderRadius: 10, marginBottom: 6, padding: '8px 10px' }}>
+                  <button className="tx-avatar" title="Alternar pago" onClick={() => updateTx(t.id, { paid: !t.paid })}
+                    style={{ background: isInc ? 'rgba(74,222,128,0.15)' : isPaid ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)', borderRadius: 10 }}>
+                    {CAT_ICON[t.category] || '📌'}
+                  </button>
+                  <div className="tx-info">
+                    <div className="tx-desc" style={{ opacity: isExp && !isPaid ? .7 : 1 }}>{t.description}</div>
+                    <div className="tx-sub">
+                      {t.category} · {t.account}
+                      {t.recurring && <span style={{ marginLeft: 4, fontSize: 10, color: '#a78bfa' }}>📌 fixo</span>}
+                      {t.installment_group_id && <span style={{ marginLeft: 4, fontSize: 10, color: '#60a5fa' }}>💳 {t.installment_index}/{t.installments}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => updateTx(t.id, { paid: !t.paid })}
+                      style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                        background: isInc ? 'rgba(74,222,128,0.2)' : isPaid ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)',
+                        color: isInc ? '#4ade80' : isPaid ? '#4ade80' : '#f87171' }}>
+                      {isInc ? '✓ recebido' : isPaid ? '✓ pago' : isCredit ? '● fatura' : '● pagar'}
+                    </button>
+                    <div className={'tx-value ' + (isInc ? 'income' : 'expense')} style={{ fontSize: 14 }}>
+                      {isInc ? '+' : '-'}{R$(t.value)}
+                    </div>
+                    <button onClick={() => handleDelete(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#94a3b8', padding: 4 }}>🗑</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className={'tx-value ' + (t.type === 'income' ? 'income' : 'expense')}>
-                    {t.type === 'income' ? '+' : '-'}{R$(t.value)}
-                  </div>
-                  <button onClick={() => handleDelete(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#94a3b8', padding: 4 }}>🗑</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ))}
       </div>
