@@ -79,6 +79,43 @@ function GastosFixosTabP() {
         <span>Ao adicionar um gasto fixo, ele é lançado automaticamente em <strong>todos os 12 meses do ano</strong>. Para lançar em meses passados manualmente, vá em <strong>Transações → selecione o mês → ➕ Lançar neste mês</strong>.</span>
       </div>
 
+      {showForm ? (
+        <div className="card">
+          <div className="card-title">Novo Gasto Fixo</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label className="label">Descrição</label>
+              <input className="input" placeholder="Ex: Aluguel, Internet..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="g2">
+              <div>
+                <label className="label">Valor (R$)</label>
+                <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Vence dia</label>
+                <input className="input" type="number" min="1" max="31" value={form.dueDay} onChange={e => setForm(f => ({ ...f, dueDay: parseInt(e.target.value) || 1 }))} />
+              </div>
+            </div>
+            <div>
+              <label className="label">Categoria</label>
+              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 12, color: '#60a5fa', padding: '4px 0' }}>
+              📅 Serão criadas despesas para todos os 12 meses do ano automaticamente.
+            </div>
+            <div className="g2">
+              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 }) }}>Cancelar</button>
+              <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Gasto Fixo</button>
+      )}
+
       {fixos.length > 0 && (
         <div className="card">
           {fixos.map(f => (
@@ -125,43 +162,6 @@ function GastosFixosTabP() {
             </div>
           ))}
         </div>
-      )}
-
-      {showForm ? (
-        <div className="card">
-          <div className="card-title">Novo Gasto Fixo</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div>
-              <label className="label">Descrição</label>
-              <input className="input" placeholder="Ex: Aluguel, Internet..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="g2">
-              <div>
-                <label className="label">Valor (R$)</label>
-                <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
-              </div>
-              <div>
-                <label className="label">Vence dia</label>
-                <input className="input" type="number" min="1" max="31" value={form.dueDay} onChange={e => setForm(f => ({ ...f, dueDay: parseInt(e.target.value) || 1 }))} />
-              </div>
-            </div>
-            <div>
-              <label className="label">Categoria</label>
-              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{ fontSize: 12, color: '#60a5fa', padding: '4px 0' }}>
-              📅 Serão criadas despesas para todos os 12 meses do ano automaticamente.
-            </div>
-            <div className="g2">
-              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setForm({ description: '', value: '', category: 'Habitação', dueDay: 5 }) }}>Cancelar</button>
-              <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Gasto Fixo</button>
       )}
 
       {fixos.length === 0 && !showForm && (
@@ -555,3 +555,4 @@ export default function PlanejamentoScreen() {
     </div>
   )
 }
+test
