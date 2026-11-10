@@ -25,6 +25,12 @@ export const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
 
 export const CAT_COLOR = {
   'Alimentação': '#22c55e',
+  'Supermercado': '#16a34a',
+  'Açougue': '#dc2626',
+  'Padaria': '#d97706',
+  'Restaurante': '#f59e0b',
+  'Pet': '#8b5cf6',
+  'Assinaturas': '#3b82f6',
   'Habitação': '#3b82f6',
   'Transporte e Comunicação': '#f97316',
   'Saúde e Cuidados': '#ec4899',
@@ -42,6 +48,12 @@ export const CAT_COLOR = {
 
 export const CAT_ICON = {
   'Alimentação': '🍽️',
+  'Supermercado': '🛒',
+  'Açougue': '🥩',
+  'Padaria': '🥖',
+  'Restaurante': '🍴',
+  'Pet': '🐾',
+  'Assinaturas': '📱',
   'Habitação': '🏠',
   'Transporte e Comunicação': '🚗',
   'Saúde e Cuidados': '💊',
@@ -58,9 +70,10 @@ export const CAT_ICON = {
 }
 
 export const CATS_EXPENSE = [
-  'Alimentação', 'Habitação', 'Transporte e Comunicação',
+  'Alimentação', 'Supermercado', 'Açougue', 'Padaria', 'Restaurante',
+  'Habitação', 'Transporte e Comunicação',
   'Saúde e Cuidados', 'Vestuário', 'Lazer', 'Investimentos',
-  'Despesas Pessoais', 'Educação', 'Outros',
+  'Despesas Pessoais', 'Educação', 'Pet', 'Assinaturas', 'Outros',
 ]
 
 export const CATS_INCOME = [

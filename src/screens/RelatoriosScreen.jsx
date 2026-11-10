@@ -345,8 +345,8 @@ function AnualTab({ transactions }) {
 
 
 // ─── GASTOS FIXOS ────────────────────────────────────────────
-const FIXOS_CATS = ['Habitação','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Outros']
-const FIXOS_ICONS = {'Habitação':'🏠','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Outros':'📌'}
+const FIXOS_CATS = ['Habitação','Alimentação','Supermercado','Açougue','Padaria','Utilities','Saúde','Transporte','Educação','Lazer','Seguros','Pet','Assinaturas','Outros']
+const FIXOS_ICONS = {'Habitação':'🏠','Alimentação':'🍽️','Supermercado':'🛒','Açougue':'🥩','Padaria':'🥖','Utilities':'💡','Saúde':'💊','Transporte':'🚗','Educação':'📚','Lazer':'🎬','Seguros':'🛡️','Pet':'🐾','Assinaturas':'📱','Outros':'📌'}
 
 function GastosFixosTab() {
   const { state, addFixo, deleteRecurringGroup, updateFixo } = useApp()

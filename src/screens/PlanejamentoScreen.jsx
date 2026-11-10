@@ -170,7 +170,7 @@ function GastosFixosTabP() {
 }
 
 const PILARES = [
-  { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação', 'Habitação', 'Transporte e Comunicação', 'Saúde e Cuidados'] },
+  { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação', 'Supermercado', 'Açougue', 'Padaria', 'Restaurante', 'Habitação', 'Transporte e Comunicação', 'Saúde e Cuidados'] },
   { id: 'invest', label: '💰 Investimentos', pct: 20, cats: [] },
   { id: 'opcio', label: '🎉 Opcionais', pct: 20, cats: ['Lazer', 'Vestuário', 'Despesas Pessoais'] },
   { id: 'proj', label: '📚 Projetos de Vida', pct: 10, cats: ['Educação'] },
