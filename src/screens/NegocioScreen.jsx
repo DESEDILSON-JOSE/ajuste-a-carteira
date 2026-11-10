@@ -1,234 +1,55 @@
 import { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine, PieChart, Pie, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
-import { R$, pct, todayStr, parseTimeSecs, fmtHours, MONTHS } from '../utils/formatters'
+import { R$, pct, todayStr, MONTHS } from '../utils/formatters'
 import { calcVPL, calcTIR, calcPayback, calcIL } from '../utils/calculations'
 import { dreAPI, vplAPI } from '../utils/api'
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, updateWorker, deleteWorker, updateWorkerItem, addTx, addToast } = useApp()
-
-  const addFamilyIncomeTx = async (workerName, earned) => {
-    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date: todayStr(), account: 'Pix', paid: true })
-  }
-
-  const addFamilyIncomeAnual = async (workerName, earned) => {
-    const year = new Date().getFullYear()
-    const rid = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))
-    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    let ok = 0
-    for (let m = 0; m < 12; m++) {
-      const day = Math.min(28, daysInMonth[m])
-      const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      try {
-        await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date, account: 'Pix', paid: false, recurring: true, recurring_id: rid })
-        ok++
-      } catch (_) {}
-    }
-    if (ok === 12) addToast(`12 lançamentos criados para ${workerName}!`)
-    else addToast(`${ok}/12 lançamentos criados`, 'error')
-  }
+  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, updateWorkerItem, addTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
 
   const items = lot.lot_items || []
   const expenses = lot.lot_expenses || []
   const workers = lot.workers || []
 
-  // ── Totais básicos ──────────────────────────────────────────
   const totalProd = items.reduce((s, i) => s + (parseFloat(i.value) || 0) * (parseInt(i.quantity) || 0), 0)
   const totalExp = expenses.reduce((s, e) => s + (parseFloat(e.value) || 0), 0)
-  const totalHoursSecs = items.reduce((s, i) => s + parseTimeSecs(i.time_per_piece) * (parseInt(i.quantity) || 0), 0)
-  const totalHours = totalHoursSecs / 3600
-  const availableHours = (lot.team_size || 0) * (lot.hours_per_day || 0) * (lot.work_days || 0)
-  const usedPct = availableHours > 0 ? (totalHours / availableHours) * 100 : 0
+  const netResult = totalProd - totalExp
+  const days = parseInt(lot.work_days) || 0
+  const dailyRate = days > 0 ? netResult / days : 0
 
-  const setLotField = (key, val) => updateLot(lotIdx, { [key]: val })
   const setItemField = (item, key, val) => updateLotItem(lotIdx, item.id, { [key]: val })
 
-  // ── Análise por colaborador ─────────────────────────────────
-  const workerAnalysis = workers.map((w, wi) => {
-    const wi_items = w.worker_items || []
-    // Horas que esse colaborador vai trabalhar (% do tempo de cada peça)
-    const workerHoursSecs = items.reduce((s, item) => {
-      const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-      const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
-      return s + (p / 100) * itemSecs
-    }, 0)
-    // Ganho total (% do valor do item)
-    const earned = items.reduce((s, item) => {
-      const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-      const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-      return s + (p / 100) * itemTotal
-    }, 0)
-    const hoursPerDay = parseFloat(w.hours_per_day) || lot.hours_per_day || 8
-    const daysNeeded = hoursPerDay > 0 ? (workerHoursSecs / 3600) / hoursPerDay : 0
-    const dailyEarned = daysNeeded > 0 ? earned / daysNeeded : 0
-    const dailyRate = parseFloat(w.daily_rate) || 0
-    const isUnderMin = dailyRate > 0 && dailyEarned < dailyRate
-    return { worker: w, wi, workerHoursSecs, earned, daysNeeded, dailyEarned, dailyRate, isUnderMin }
-  })
-
-  // Colaborador com menor ganho/dia (referência para análise de prejuízo)
-  const minEarner = workerAnalysis.filter(a => a.dailyEarned > 0)
-    .reduce((min, a) => (!min || a.dailyEarned < min.dailyEarned) ? a : min, null)
-
-  // Prazo: dias que o lote leva (quem demorar mais define o prazo)
-  const maxDays = workerAnalysis.length > 0
-    ? Math.max(...workerAnalysis.map(a => a.daysNeeded))
-    : (lot.hours_per_day || 8) > 0 ? totalHours / (lot.hours_per_day || 8) : 0
-
-  // Data de término baseada na data de início
-  const startDate = lot.start_date ? new Date(lot.start_date + 'T12:00:00') : null
-  const endDate = startDate && maxDays > 0
-    ? new Date(startDate.getTime() + Math.ceil(maxDays) * 24 * 3600 * 1000) : null
-  const fmtD = d => d ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '–'
-
-  // Custo total dos colaboradores e lucro real
-  const totalWorkerCost = workerAnalysis.reduce((s, a) => s + a.earned, 0)
-  const trueProfit = totalProd - totalWorkerCost - totalExp
-  const trueProfitPerDay = maxDays > 0 ? trueProfit / maxDays : 0
-
-  const teamRealDailyHours = workers.length > 0
-    ? workers.reduce((s, w) => s + (parseFloat(w.hours_per_day) || lot.hours_per_day || 8), 0)
-    : (lot.team_size || 0) * (lot.hours_per_day || 8)
-  const teamRealDailyHoursConfig = (lot.team_size || 0) * (lot.hours_per_day || 8)
-  const totalQty = items.reduce((s, i) => s + (parseInt(i.quantity) || 0), 0)
-  const secsPerPiece = totalQty > 0 ? totalHoursSecs / totalQty : 0
-  const piecesPerDay = secsPerPiece > 0 && teamRealDailyHours > 0
-    ? Math.floor((teamRealDailyHours * 3600) / secsPerPiece) : 0
-  const totalDaysEvo = piecesPerDay > 0 ? Math.ceil(totalQty / piecesPerDay) : 0
-  const todayDate = new Date()
-  const daysElapsed = startDate ? Math.max(0, Math.floor((todayDate - startDate) / (24*3600*1000))) : 0
-  const piecesCompleted = Math.min(totalQty, daysElapsed * piecesPerDay)
-  const progressPct = totalQty > 0 ? (piecesCompleted / totalQty) * 100 : 0
+  const addFamilyIncomeTx = async (workerName, earned) => {
+    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date: todayStr(), account: 'Pix', paid: true })
+    addToast(`Renda de ${workerName} lançada!`)
+  }
 
   return (
     <div>
-      {/* Capacidade */}
+      {/* PRODUÇÃO GERAL */}
       <div className="card">
-        <div className="card-title">📊 Capacidade da Equipe</div>
-        <div className="g3" style={{ marginBottom: 12 }}>
-          {[['team_size', 'Funcionários'], ['hours_per_day', 'Horas/dia'], ['work_days', 'Dias ref.']].map(([key, label]) => (
-            <div key={key}>
-              <label className="label">{label}</label>
-              <input className="input" type="number" inputMode="numeric"
-                value={lot[key] || ''} onChange={e => setLotField(key, parseInt(e.target.value) || 0)} />
-            </div>
-          ))}
-        </div>
-        {/* Data de início */}
-        <div style={{ marginBottom: 10 }}>
-          <label className="label">Data de início do lote</label>
-          <input className="input" type="date" value={lot.start_date || ''}
-            onChange={e => setLotField('start_date', e.target.value)} />
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-            <span>Horas totais do lote: <b>{fmtHours(totalHoursSecs)}</b></span>
-            <span style={{ color: usedPct > 100 ? '#ef4444' : usedPct > 90 ? '#f59e0b' : '#22c55e', fontWeight: 700 }}>{usedPct.toFixed(0)}%</span>
-          </div>
-          <div className="prog">
-            <div className="prog-fill" style={{ width: `${Math.min(100, usedPct)}%`, background: usedPct > 100 ? '#ef4444' : usedPct > 90 ? '#f59e0b' : '#22c55e' }} />
-          </div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-            {usedPct > 100 ? `🔴 Excede em ${fmtHours((totalHoursSecs - availableHours * 3600))}` :
-              usedPct > 90 ? '🟡 Capacidade no limite' : '🟢 Capacidade OK'}
-          </div>
-        </div>
-      </div>
-
-      {/* Raio X */}
-      {workers.length > 0 && (
-        <div className="card">
-          <div className="card-title">🔭 Raio X — Capacidade</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <div style={{ background: 'rgba(59,130,246,0.12)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>⚙️ Config. global</div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: '#60a5fa' }}>{teamRealDailyHoursConfig}h/dia</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{lot.team_size || 0} func × {lot.hours_per_day || 0}h</div>
-            </div>
-            <div style={{ background: 'rgba(34,197,94,0.12)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>👥 Real cadastrados</div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: '#4ade80' }}>{teamRealDailyHours}h/dia</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{workers.length} colaboradores</div>
-            </div>
-          </div>
-          {workers.map(w => {
-            const wh = parseFloat(w.hours_per_day) || lot.hours_per_day || 8
-            const pctCap = teamRealDailyHours > 0 ? (wh / teamRealDailyHours) * 100 : 0
-            return (
-              <div key={w.id} style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600 }}>{w.name}</span>
-                  <span style={{ color: '#94a3b8' }}>{wh}h/dia · {pctCap.toFixed(0)}% da equipe</span>
-                </div>
-                <div className="prog">
-                  <div className="prog-fill" style={{ width: , background: '#3b82f6' }} />
-                </div>
-              </div>
-            )
-          })}
-          {piecesPerDay > 0 && (
-            <div style={{ background: 'rgba(245,158,11,0.12)', borderRadius: 8, padding: '8px 12px', marginTop: 6, fontSize: 12, border: '1px solid rgba(245,158,11,0.2)' }}>
-              <span style={{ color: '#fbbf24', fontWeight: 700 }}>🎯 Ritmo real: ~{piecesPerDay} peças/dia · {totalDaysEvo} dias p/ concluir</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Prazo do lote */}
-      {(maxDays > 0 || startDate) && (
-        <div className="card" style={{ background: 'rgba(255,255,255,0.06)', borderColor: endDate ? '#22c55e' : 'rgba(255,255,255,0.08)' }}>
-          <div className="card-title">📅 Prazo do Lote</div>
-          <div className="g2" style={{ gap: 10 }}>
-            <div className="stat">
-              <div className="stat-label">Dias para concluir</div>
-              <div style={{ fontWeight: 700, fontSize: 18, color: '#60a5fa' }}>{maxDays > 0 ? Math.ceil(maxDays) : '–'}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-label">Início</div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{startDate ? fmtD(startDate) : '—'}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-label">Término previsto</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#4ade80' }}>{endDate ? fmtD(endDate) : '—'}</div>
-            </div>
-          </div>
-          {!lot.start_date && maxDays > 0 && (
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>Defina a data de início para ver o prazo.</div>
-          )}
-        </div>
-      )}
-
-      {/* Tabela produção */}
-      <div className="card">
-        <div className="card-title">🪡 Itens de Produção</div>
+        <div className="card-title">🪡 Produção Geral</div>
         <div className="scroll-x">
           <table className="tbl">
-            <thead><tr><th>REF</th><th>Descrição</th><th>R$/pç</th><th>Tempo</th><th>Qtd</th><th>H.Total</th><th>Total R$</th><th></th></tr></thead>
+            <thead><tr><th>REF</th><th>Descrição</th><th>Valor/pç</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
             <tbody>
-              {items.map(item => {
-                const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
-                return (
-                  <tr key={item.id}>
-                    <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
-                    <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
-                    <td><input className="tbl-input" style={{ width: 60 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
-                    <td><input className="tbl-input" style={{ width: 70 }} placeholder="01:00:00" value={item.time_per_piece || ''} onChange={e => setItemField(item, 'time_per_piece', e.target.value)} /></td>
-                    <td><input className="tbl-input" style={{ width: 40 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
-                    <td style={{ fontSize: 11, color: '#94a3b8' }}>{fmtHours(itemSecs)}</td>
-                    <td style={{ fontWeight: 600 }}>{R$((item.value || 0) * (item.quantity || 0))}</td>
-                    <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
-                  </tr>
-                )
-              })}
+              {items.map(item => (
+                <tr key={item.id}>
+                  <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
+                  <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
+                  <td><input className="tbl-input" style={{ width: 70 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
+                  <td><input className="tbl-input" style={{ width: 50 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
+                  <td style={{ fontWeight: 600, color: '#4ade80' }}>{R$((parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0))}</td>
+                  <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600 }}>TOTAL</td>
-                <td></td>
-                <td style={{ fontWeight: 700, color: '#60a5fa', fontSize: 12 }}>{fmtHours(totalHoursSecs)}</td>
+                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DAS PRODUÇÕES</td>
                 <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</td>
                 <td></td>
               </tr>
@@ -238,291 +59,146 @@ function FaccoesTab({ lot, lotIdx }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
       </div>
 
-      {/* Evolução do Lote */}
-      {startDate && maxDays > 0 && totalQty > 0 && (
-        <div className="card">
-          <div className="card-title">📈 Evolução do Lote</div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-              <span style={{ color: '#94a3b8' }}>Progresso estimado</span>
-              <span style={{ fontWeight: 700, color: progressPct >= 100 ? '#4ade80' : '#60a5fa' }}>
-                {piecesCompleted}/{totalQty} peças · {progressPct.toFixed(0)}%
-              </span>
-            </div>
-            <div className="prog">
-              <div className="prog-fill" style={{
-                width: progressPct + '%',
-                background: progressPct >= 100 ? '#22c55e' : progressPct > 60 ? '#3b82f6' : '#f59e0b'
-              }} />
-            </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-              Dia {daysElapsed} de {totalDaysEvo} · {piecesPerDay > 0 ? '~' + piecesPerDay + ' peças/dia' : ''}
-            </div>
-          </div>
-          {piecesPerDay > 0 && totalDaysEvo > 0 && totalDaysEvo <= 20 && (
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ display: 'flex', gap: 4, minWidth: 'max-content', paddingBottom: 4 }}>
-                {Array.from({ length: totalDaysEvo }, (_, d) => {
-                  const dayPcs = Math.min(totalQty - d * piecesPerDay, piecesPerDay)
-                  const isDone = d < daysElapsed
-                  const isToday = d === daysElapsed
-                  return (
-                    <div key={d} style={{
-                      background: isDone ? 'rgba(34,197,94,0.18)' : isToday ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.04)',
-                      border: isToday ? '1.5px solid #60a5fa' : isDone ? '1.5px solid rgba(74,222,128,0.3)' : '1.5px solid rgba(255,255,255,0.06)',
-                      borderRadius: 8, padding: '6px 8px', textAlign: 'center', minWidth: 52
-                    }}>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>Dia {d+1}</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#4ade80' : isToday ? '#60a5fa' : '#94a3b8' }}>
-                        {dayPcs}pç
-                      </div>
-                      {isToday && <div style={{ fontSize: 9, color: '#60a5fa', fontWeight: 700 }}>hoje</div>}
-                      {isDone && <div style={{ fontSize: 9, color: '#4ade80' }}>✓</div>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-          {totalHoursSecs > 0 && (
-            <div style={{ marginTop: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#94a3b8' }}>Valor médio por hora</span>
-                <span style={{ fontWeight: 700, color: '#60a5fa' }}>R$ {totalHours > 0 ? (totalProd / totalHours).toFixed(2).replace('.', ',') : '0,00'}/h</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8' }}>Total {fmtHours(totalHoursSecs)}</span>
-                <span style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Gastos */}
+      {/* GASTOS COM AS FACÇÕES */}
       <div className="card">
-        <div className="card-title">💸 Gastos do Lote</div>
+        <div className="card-title">💸 Gastos com as Facções</div>
         <div className="scroll-x">
           <table className="tbl">
             <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
             <tbody>
               {expenses.map(e => (
                 <tr key={e.id}>
-                  <td style={{ fontSize: 11 }}>{e.date}</td>
+                  <td style={{ fontSize: 11, color: '#94a3b8' }}>{e.date}</td>
                   <td>{e.description}</td>
-                  <td style={{ fontWeight: 600, color: '#dc2626' }}>{R$(e.value)}</td>
+                  <td style={{ fontWeight: 600, color: '#f87171' }}>{R$(e.value)}</td>
                   <td><button onClick={() => deleteExpense(lotIdx, e.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr><td colSpan={2} style={{ textAlign: 'right' }}>TOTAL GASTOS</td><td colSpan={2} style={{ fontWeight: 700, color: '#dc2626' }}>{R$(totalExp)}</td></tr></tfoot>
+            <tfoot>
+              <tr>
+                <td colSpan={2} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DE GASTOS</td>
+                <td colSpan={2} style={{ fontWeight: 700, color: '#f87171' }}>{totalExp > 0 ? R$(totalExp) : '—'}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
       </div>
 
-      {/* Costureiras */}
-      <div className="card">
-        <div className="card-title">👥 Funcionários / Costureiras</div>
-        {workerAnalysis.map(({ worker: w, wi, workerHoursSecs, earned, daysNeeded, dailyEarned, dailyRate, isUnderMin }) => (
-          <div key={w.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '0.5px solid #e2e8f0' }}>
-            {/* Cabeçalho */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{w.name}</div>
-                {isUnderMin && <span style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', color: '#f87171', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>⚠ Abaixo do mínimo</span>}
-                <button
-                  onClick={() => updateWorker(lotIdx, wi, w.id, { is_family_income: !w.is_family_income })}
-                  title={w.is_family_income ? 'Remover da receita familiar' : 'Marcar como receita da família'}
-                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 600,
-                    background: w.is_family_income ? 'rgba(74,222,128,0.15)' : '#f1f5f9',
-                    color: w.is_family_income ? '#16a34a' : '#64748b' }}>
-                  {w.is_family_income ? '👨‍👩‍👧 Família ✓' : '👤 Família?'}
-                </button>
-              </div>
+      {/* PARTICIPANTES — um card por pessoa */}
+      {workers.map((w, wi) => {
+        const wi_items = w.worker_items || []
+        const workerEarned = items.reduce((s, item) => {
+          const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
+          const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
+          return s + (p / 100) * itemTotal
+        }, 0)
+        return (
+          <div key={w.id} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>👤 {w.name}</div>
               <button onClick={() => deleteWorker(lotIdx, w.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}
-                title="Excluir colaborador">🗑</button>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>🗑</button>
             </div>
-            {/* Mínimo/dia */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Mínimo/dia (R$):</label>
-              <input className="input" type="number" inputMode="decimal"
-                value={w.daily_rate || ''} placeholder="0,00"
-                style={{ maxWidth: 110, fontSize: 12, padding: '6px 8px' }}
-                onChange={e => updateWorker(lotIdx, wi, w.id, { daily_rate: parseFloat(e.target.value) || 0 })} />
+            <div className="scroll-x">
+              <table className="tbl">
+                <thead><tr><th>REF</th><th>Descrição</th><th>%</th><th>Valor</th></tr></thead>
+                <tbody>
+                  {items.map(item => {
+                    const pctVal = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
+                    const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
+                    const earned_item = (pctVal / 100) * itemTotal
+                    return (
+                      <tr key={item.ref || item.id}>
+                        <td style={{ color: '#94a3b8', fontSize: 11 }}>{item.ref}</td>
+                        <td style={{ fontSize: 12 }}>{item.description}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <input className="tbl-input" type="number" inputMode="decimal"
+                              value={pctVal || ''} placeholder="0"
+                              style={{ width: 50, textAlign: 'right' }}
+                              onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}>%</span>
+                          </div>
+                        </td>
+                        <td style={{ color: '#4ade80', fontWeight: 600 }}>{R$(earned_item)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DAS PRODUÇÕES</td>
+                    <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(workerEarned)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            {/* Horas/dia individual */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <label className="label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Horas/dia:</label>
-              <input className="input" type="number" inputMode="decimal"
-                value={w.hours_per_day || ''} placeholder={lot.hours_per_day || 8}
-                style={{ maxWidth: 80, fontSize: 12, padding: '6px 8px' }}
-                onChange={e => updateWorker(lotIdx, wi, w.id, { hours_per_day: parseFloat(e.target.value) || 0 })} />
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>h/dia (global: {lot.hours_per_day || 8}h)</span>
-            </div>
-            {/* % por peça */}
-            {items.map(item => {
-              const pctVal = parseFloat((w.worker_items || []).find(x => x.lot_item_ref === item.ref)?.value || 0)
-              const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-              const itemSecs = parseTimeSecs(item.time_per_piece) * (parseInt(item.quantity) || 0)
-              const earned_item = (pctVal / 100) * itemTotal
-              const secs_item = (pctVal / 100) * itemSecs
-              return (
-                <div key={item.ref} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
-                  <span style={{ width: 44, color: '#94a3b8', flexShrink: 0 }}>{item.ref}</span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#cbd5e1' }}>{item.description}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                    <input className="input" type="number" inputMode="decimal"
-                      value={pctVal || ''} placeholder="0"
-                      style={{ width: 54, fontSize: 12, padding: '5px 6px', textAlign: 'right' }}
-                      onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
-                    <span style={{ color: '#94a3b8' }}>%</span>
-                  </div>
-                  <span style={{ color: '#4ade80', width: 66, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{R$(earned_item)}</span>
-                  <span style={{ color: '#94a3b8', width: 60, textAlign: 'right', flexShrink: 0 }}>{secs_item > 0 ? fmtHours(secs_item) : ''}</span>
-                </div>
-              )
-            })}
-            {/* Resumo do colaborador */}
-            <div style={{ background: isUnderMin ? 'rgba(239,68,68,0.1)' : 'rgba(74,222,128,0.08)', borderRadius: 8, padding: '10px 12px', marginTop: 10 }}>
-              <div className="g2" style={{ gap: 8 }}>
-                <div className="stat" style={{ background: 'transparent' }}>
-                  <div className="stat-label">Total ganho</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#4ade80' }}>{R$(earned)}</div>
-                </div>
-                <div className="stat" style={{ background: 'transparent' }}>
-                  <div className="stat-label">Horas totais</div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{fmtHours(workerHoursSecs)}</div>
-                </div>
-                <div className="stat" style={{ background: 'transparent' }}>
-                  <div className="stat-label">Dias necessários</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#60a5fa' }}>{daysNeeded > 0 ? daysNeeded.toFixed(1) : '–'}</div>
-                </div>
-                <div className="stat" style={{ background: 'transparent' }}>
-                  <div className="stat-label">Ganho/dia</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: isUnderMin ? '#dc2626' : '#15803d' }}>
-                    {dailyEarned > 0 ? R$(dailyEarned) : '–'}
-                    {dailyRate > 0 && <span style={{ fontSize: 11, marginLeft: 4, opacity: 0.8 }}>/ mín {R$(dailyRate)}</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Painel de receita familiar */}
-            {w.is_family_income && (
-              <div style={{ marginTop: 10, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', marginBottom: 8 }}>
-                  👨‍👩‍👧 Receita da família — {R$(earned)} este lote
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn-sm" style={{ background: 'rgba(74,222,128,0.2)', color: '#4ade80', fontSize: 12 }}
-                    onClick={() => addFamilyIncomeTx(w.name, earned)}>
-                    📥 Lançar renda do mês
-                  </button>
-                  <button className="btn btn-sm" style={{ background: 'rgba(96,165,250,0.2)', color: '#60a5fa', fontSize: 12 }}
-                    onClick={() => addFamilyIncomeAnual(w.name, earned)}>
-                    📅 Projetar anual (12×)
-                  </button>
-                </div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
-                  "Lançar renda do mês" registra {R$(earned)} como receita hoje. "Projetar anual" cria 12 lançamentos mensais de {R$(earned)} para {new Date().getFullYear()}.
-                </div>
-              </div>
+            {w.is_family_income && workerEarned > 0 && (
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, color: '#4ade80' }}
+                onClick={() => addFamilyIncomeTx(w.name, workerEarned)}>
+                📥 Lançar como receita familiar
+              </button>
             )}
           </div>
-        ))}
+        )
+      })}
+
+      {/* Adicionar participante */}
+      <div className="card">
+        <div className="card-title">👥 Participantes</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input className="input" placeholder="Nome da costureira" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
+          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
           <button className="btn btn-dark btn-sm" onClick={() => { if (newWorkerName.trim()) { addWorker(lotIdx, newWorkerName.trim()); setNewWorkerName('') } }}>+ Adicionar</button>
         </div>
       </div>
 
-      {/* Relatório de capacidade por colaborador */}
-      {workerAnalysis.length > 0 && totalHoursSecs > 0 && (
+      {/* RELATÓRIO DE GANHOS E GASTOS */}
+      {totalProd > 0 && (
         <div className="card">
-          <div className="card-title">📋 Relatório de Capacidade</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
-            Distribuição das horas do lote ({fmtHours(totalHoursSecs)} totais) · equipe: {teamRealDailyHours}h/dia
+          <div className="card-title">📊 Relatório de Ganhos e Gastos</div>
+          <div style={{ textAlign: 'right', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 2 }}>TOTAL</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: netResult >= 0 ? '#4ade80' : '#f87171' }}>{R$(netResult)}</div>
           </div>
-          {workerAnalysis.map(({ worker: w, workerHoursSecs: wSecs, daysNeeded, dailyEarned, dailyRate, isUnderMin }) => {
-            const pctOfTotal = totalHoursSecs > 0 ? (wSecs / totalHoursSecs) * 100 : 0
-            return (
-              <div key={w.id} style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600 }}>{w.name}</span>
-                  <span style={{ color: '#94a3b8' }}>{fmtHours(wSecs)} · {daysNeeded.toFixed(1)} dias · {parseFloat(w.hours_per_day) || lot.hours_per_day || 8}h/dia</span>
-                </div>
-                <div className="prog">
-                  <div className="prog-fill" style={{
-                    width: `${Math.min(100, pctOfTotal)}%`,
-                    background: isUnderMin ? '#ef4444' : '#22c55e'
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
-                  <span>{pctOfTotal.toFixed(0)}% do tempo total</span>
-                  <span style={{ color: isUnderMin ? '#dc2626' : '#64748b', fontWeight: isUnderMin ? 700 : 400 }}>
-                    {dailyEarned > 0 ? `${R$(dailyEarned)}/dia` : ''}
-                    {isUnderMin ? ` ⚠ abaixo do mín (${R$(dailyRate)})` : ''}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-          {/* Referência: menor ganhador */}
-          {minEarner && (
-            <div style={{ background: '#fef3c7', borderRadius: 8, padding: '8px 10px', fontSize: 12, marginTop: 4 }}>
-              <b>Referência (menor ganho/dia):</b> {minEarner.worker.name} · {R$(minEarner.dailyEarned)}/dia
-              {minEarner.isUnderMin && ` — ⚠ abaixo do mínimo definido (${R$(minEarner.dailyRate)})`}
+          {totalExp > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ color: '#94a3b8' }}>(-) Gastos com facções</span>
+              <span style={{ fontWeight: 600, color: '#f87171' }}>- {R$(totalExp)}</span>
             </div>
           )}
+          {workers.length > 1 && (
+            <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Dividido para ({workers.map(w => w.name).join(' & ')})
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#60a5fa' }}>{R$(netResult / workers.length)}</div>
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Valores e dias</div>
+            <div className="g2" style={{ gap: 8, alignItems: 'flex-end' }}>
+              <div>
+                <label className="label">Dias trabalhados</label>
+                <input className="input" type="number" inputMode="numeric"
+                  value={lot.work_days || ''} placeholder="0"
+                  onChange={e => updateLot(lotIdx, { work_days: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="stat">
+                <div className="stat-label">Preço do dia</div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: '#fbbf24' }}>
+                  {days > 0 ? R$(dailyRate) : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Resumo Financeiro Real */}
-      <div className="card">
-        <div className="card-title">💰 Resumo Financeiro Real</div>
-        {/* Linha detalhada */}
-        {[
-          { label: 'Receita bruta (lote)', val: totalProd, color: '#4ade80' },
-          { label: '(-) Custo colaboradores', val: -totalWorkerCost, color: '#dc2626' },
-          { label: '(-) Outros gastos', val: -totalExp, color: '#dc2626' },
-        ].map(({ label, val, color }) => (
-          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '0.5px solid #f1f5f9' }}>
-            <span style={{ color: '#94a3b8' }}>{label}</span>
-            <span style={{ fontWeight: 600, color }}>{R$(Math.abs(val))}</span>
-          </div>
-        ))}
-        {/* Resultado */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginTop: 10, padding: '12px', borderRadius: 10,
-          background: trueProfit >= 0 ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
-          border: `1.5px solid ${trueProfit >= 0 ? '#86efac' : '#fca5a5'}`
-        }}>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>
-            {trueProfit >= 0 ? '✅ LUCRO REAL' : '❌ PREJUÍZO'}
-          </span>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 700, fontSize: 18, color: trueProfit >= 0 ? '#15803d' : '#dc2626' }}>{R$(trueProfit)}</div>
-            {maxDays > 0 && <div style={{ fontSize: 12, color: '#94a3b8' }}>{R$(trueProfitPerDay)}/dia · {maxDays > 0 ? Math.ceil(maxDays) : 0} dias</div>}
-          </div>
-        </div>
-        {totalWorkerCost > 0 && totalProd > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <div className="stat" style={{ flex: 1 }}>
-              <div className="stat-label">Margem real</div>
-              <div style={{ fontWeight: 700, color: trueProfit >= 0 ? '#15803d' : '#dc2626' }}>{pct((trueProfit / totalProd) * 100)}</div>
-            </div>
-            <div className="stat" style={{ flex: 1 }}>
-              <div className="stat-label">% colaboradores</div>
-              <div style={{ fontWeight: 700, color: '#b45309' }}>{pct((totalWorkerCost / totalProd) * 100)}</div>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
+
 
 // ─── DRE TAB ────────────────────────────────────────────────
 const DRE_STRUCTURE = [
