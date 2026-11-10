@@ -330,33 +330,33 @@ export default function DashboardScreen() {
         )}
 
         {/* Cálculos automáticos */}
-        {monthIncome > 0 || monthExpense > 0 ? (
+        {totalIncome > 0 || totalExpense > 0 ? (
           <div className="card" style={{ borderTop: '3px solid #8b5cf6' }}>
             <div className="card-title" style={{ color: '#a78bfa' }}>📊 Resumo do Mês</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
               {[
-                { label: 'Total Receitas', value: monthIncome, color: '#4ade80', sign: '+' },
-                { label: 'Total Despesas', value: monthExpense, color: '#f87171', sign: '-' },
-                { label: 'Saldo Livre', value: monthIncome - monthExpense, color: monthIncome - monthExpense >= 0 ? '#4ade80' : '#f87171', sign: '' },
+                { label: 'Total Receitas', value: totalIncome, color: '#4ade80', sign: '+' },
+                { label: 'Total Despesas', value: totalExpense, color: '#f87171', sign: '-' },
+                { label: 'Saldo Livre', value: totalIncome - totalExpense, color: totalIncome - totalExpense >= 0 ? '#4ade80' : '#f87171', sign: '' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <span style={{ color: '#94a3b8' }}>{r.label}</span>
                   <span style={{ fontWeight: 700, color: r.color }}>{r.sign}{R$(Math.abs(r.value))}</span>
                 </div>
               ))}
-              {monthIncome > 0 && (
+              {totalIncome > 0 && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ color: '#94a3b8' }}>% Comprometido</span>
-                    <span style={{ fontWeight: 700, color: (monthExpense/monthIncome*100) > 90 ? '#ef4444' : (monthExpense/monthIncome*100) > 70 ? '#f59e0b' : '#4ade80' }}>{(monthExpense/monthIncome*100).toFixed(1)}%</span>
+                    <span style={{ fontWeight: 700, color: (totalExpense/totalIncome*100) > 90 ? '#ef4444' : (totalExpense/totalIncome*100) > 70 ? '#f59e0b' : '#4ade80' }}>{(totalExpense/totalIncome*100).toFixed(1)}%</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ color: '#94a3b8' }}>Projeção Anual Receita</span>
-                    <span style={{ fontWeight: 700, color: '#4ade80' }}>+{R$(monthIncome * 12)}</span>
+                    <span style={{ fontWeight: 700, color: '#4ade80' }}>+{R$(totalIncome * 12)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
                     <span style={{ color: '#94a3b8' }}>Projeção Anual Despesas</span>
-                    <span style={{ fontWeight: 700, color: '#f87171' }}>-{R$(monthExpense * 12)}</span>
+                    <span style={{ fontWeight: 700, color: '#f87171' }}>-{R$(totalExpense * 12)}</span>
                   </div>
                 </>
               )}
