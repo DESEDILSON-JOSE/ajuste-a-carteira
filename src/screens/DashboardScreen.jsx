@@ -198,10 +198,10 @@ export default function DashboardScreen() {
             <span>{MONTHS[selM - 1]} {selY}</span>
             <button onClick={() => changeMonth(1)}>›</button>
           </div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171' }}>{R$(cumulativeBalance)}</div>
-          <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>Saldo acumulado</div>
-          <div style={{ fontSize: 13, color: balance >= 0 ? '#4ade80' : '#f87171', marginBottom: 8 }}>
-            {balance >= 0 ? '+' : ''}{R$(balance)} <span style={{ color: 'var(--cinza)', fontWeight: 400 }}>este mês</span>
+          <div style={{ fontSize: 36, fontWeight: 700, color: balance >= 0 ? '#4ade80' : '#f87171' }}>{balance >= 0 ? '+' : ''}{R$(balance)}</div>
+          <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>Saldo do mês</div>
+          <div style={{ fontSize: 12, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171', marginBottom: 8 }}>
+            {R$(cumulativeBalance)} <span style={{ color: 'var(--cinza)', fontWeight: 400 }}>acumulado</span>
           </div>
           <div className="g2" style={{ gap: 8 }}>
             <div style={{ background: 'rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px' }}>
