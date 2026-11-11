@@ -222,7 +222,7 @@ export default function DashboardScreen() {
         </div>
       </div>
 
-      <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ padding: '16px 16px 0', marginTop: 8 }}>
         {/* Alertas */}
         {overdue.length > 0 && (
           <div className="card" style={{ borderColor: '#ef4444', borderWidth: 1 }}>
