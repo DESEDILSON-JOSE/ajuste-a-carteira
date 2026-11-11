@@ -97,7 +97,7 @@ export default function DashboardScreen() {
 
   const { budgets } = state
 
-  const { monthTxs, totalIncome, totalExpense, balance, prevBalance, byCategory, overdue, dueToday, last8 } = useMemo(() => {
+  const { monthTxs, totalIncome, totalExpense, balance, prevBalance, byCategory, overdue, dueToday, creditCardUnpaid, creditCardTotal, creditCardAll, last8 } = useMemo(() => {
     const monthTxs = transactions.filter(t => {
       const d = new Date(t.date + 'T12:00:00')
       return d.getMonth() + 1 === selM && d.getFullYear() === selY
@@ -120,10 +120,14 @@ export default function DashboardScreen() {
     })
     const overdue = monthTxs.filter(t => t.type === 'expense' && !t.paid && t.date <= today)
     const dueToday = monthTxs.filter(t => t.type === 'expense' && !t.paid && t.date === today)
+    const creditCardAll = monthTxs.filter(t => t.type === 'expense' && t.account === 'Cartão de Crédito')
+    const creditCardUnpaid = creditCardAll.filter(t => !t.paid)
+    const creditCardTotal = creditCardAll.reduce((s, t) => s + t.value, 0)
     return {
       monthTxs, totalIncome: inc, totalExpense: exp, balance: inc - exp,
       prevBalance: pInc - pExp,
       byCategory, overdue, dueToday,
+      creditCardUnpaid, creditCardTotal, creditCardAll,
       last8: [...monthTxs].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8),
     }
   }, [transactions, selM, selY, today])
@@ -228,6 +232,37 @@ export default function DashboardScreen() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+
+        {/* Fatura do Cartão de Crédito */}
+        {creditCardAll.length > 0 && (
+          <div className="card" style={{ borderColor: creditCardUnpaid.length === 0 ? '#22c55e' : '#8b5cf6', borderWidth: 1, background: creditCardUnpaid.length === 0 ? 'rgba(34,197,94,0.05)' : 'rgba(139,92,246,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div>
+                <div className="card-title" style={{ color: creditCardUnpaid.length === 0 ? '#4ade80' : '#a78bfa', marginBottom: 2 }}>💳 Fatura do Cartão</div>
+                <div style={{ fontSize: 11, color: 'var(--cinza)' }}>
+                  {creditCardAll.length} lançamento{creditCardAll.length > 1 ? 's' : ''} •{' '}
+                  {creditCardUnpaid.length === 0
+                    ? <span style={{ color: '#4ade80', fontWeight: 600 }}>✅ Fatura paga</span>
+                    : <span style={{ color: '#f87171' }}>{creditCardUnpaid.length} em aberto</span>
+                  }
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: creditCardUnpaid.length === 0 ? '#4ade80' : '#c4b5fd' }}>{R$(creditCardTotal)}</div>
+                <div style={{ fontSize: 10, color: 'var(--cinza)' }}>total da fatura</div>
+              </div>
+            </div>
+            {creditCardUnpaid.length > 0 && (
+              <button
+                onClick={() => payCardBill(creditCardUnpaid.map(t => t.id))}
+                style={{ width: '100%', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', border: 'none', color: '#fff', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                ✅ Pagar Fatura — {R$(creditCardTotal)}
+              </button>
+            )}
           </div>
         )}
 

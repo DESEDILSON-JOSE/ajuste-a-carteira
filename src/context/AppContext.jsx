@@ -230,6 +230,16 @@ export function AppProvider({ children }) {
     catch (err) { addToast('Erro ao atualizar', 'error') }
   }
 
+
+  const payCardBill = async (ids) => {
+    for (const id of ids) {
+      dispatch({ type: 'UPDATE_TX', id, data: { paid: true } })
+      try { await txAPI.update(id, { paid: true }) }
+      catch (err) { /* silently continue */ }
+    }
+    addToast('Fatura do cartão paga! ✅', 'success')
+  }
+
   const deleteTx = async (id) => {
     dispatch({ type: 'DEL_TX', id })
     try { await txAPI.delete(id) }
@@ -491,7 +501,7 @@ export function AppProvider({ children }) {
   const value = {
     state, dispatch, addToast,
     login, signup, logout, resetPwd, updatePwd,
-    addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup, updateFixo, addReceitaFixa,
+    addTx, updateTx, deleteTx, payCardBill, addFixo, deleteRecurringGroup, updateFixo, addReceitaFixa,
     saveBudget, deleteBudget,
     updateGoal, deleteGoal,
     addLot, updateLot,
