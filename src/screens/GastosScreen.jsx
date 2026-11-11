@@ -178,7 +178,7 @@ export default function GastosScreen() {
         )}
 
         {tabTxs.map(tx => (
-          <div key={tx.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--card)', borderRadius: 10, padding: '14px 14px', marginBottom: 12 }}>
+          <div key={tx.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--card)', borderRadius: 10, padding: '16px 14px', marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>{tx.category} · {tx.date}</div>
