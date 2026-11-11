@@ -123,11 +123,19 @@ export default function DashboardScreen() {
     const creditCardAll = monthTxs.filter(t => t.type === 'expense' && t.account === 'Cartão de Crédito')
     const creditCardUnpaid = creditCardAll.filter(t => !t.paid)
     const creditCardTotal = creditCardAll.reduce((s, t) => s + t.value, 0)
-    // Saldo acumulado: soma de todos os meses até o mês selecionado (inclusive)
+    // Saldo acumulado: só a partir do primeiro lançamento do usuário no app
+    const firstTxDate = transactions.length > 0
+      ? transactions.reduce((min, t) => t.date < min ? t.date : min, transactions[0].date)
+      : null
+    const firstTxYear = firstTxDate ? parseInt(firstTxDate.slice(0,4)) : selY
+    const firstTxMonth = firstTxDate ? parseInt(firstTxDate.slice(5,7)) : selM
     const cumulativeBalance = transactions.reduce((acc, t) => {
       const d = new Date(t.date + 'T12:00:00')
       const tY = d.getFullYear()
       const tM = d.getMonth() + 1
+      // Ignora meses anteriores ao primeiro lançamento
+      if (tY < firstTxYear || (tY === firstTxYear && tM < firstTxMonth)) return acc
+      // Ignora meses futuros ao selecionado
       if (tY > selY || (tY === selY && tM > selM)) return acc
       return t.type === 'income' ? acc + t.value : t.type === 'expense' ? acc - t.value : acc
     }, 0)
