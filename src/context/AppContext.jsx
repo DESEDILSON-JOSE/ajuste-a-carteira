@@ -112,7 +112,7 @@ export function AppProvider({ children }) {
         profileAPI.get(userId),
         txAPI.getAll(userId),
         goalsAPI.getAll(userId),
-        lotsAPI.getAll(userId),
+        lotsAPI.getAll(userId, new Date().toISOString().slice(0, 7)),
         vplAPI.getAll(userId),
         budgetsAPI.getAll(userId),
       ])
@@ -362,7 +362,8 @@ export function AppProvider({ children }) {
 
   const addLot = async (name) => {
     try {
-      const lot = await lotsAPI.create({ name, user_id: state.user.id, team_size: 5, hours_per_day: 8, work_days: 22 })
+      const month = new Date().toISOString().slice(0, 7)
+      const lot = await lotsAPI.create({ name, user_id: state.user.id, team_size: 5, hours_per_day: 8, work_days: 22, month })
       dispatch({ type: 'ADD_LOT', lot: { ...lot, lot_items: [], lot_expenses: [], workers: [] } })
       dispatch({ type: 'SET_LOT_IDX', idx: state.lots.length })
       addToast('Lote criado!')
@@ -498,6 +499,25 @@ export function AppProvider({ children }) {
     catch (err) { addToast('Erro ao salvar renda', 'error') }
   }
 
+  const addFamilyMember = async (name) => {
+    const existing = state.profile?.family_members || []
+    if (existing.find(m => m.name === name)) return
+    const updated = [...existing, { id: Date.now().toString(36), name }]
+    const newProfile = { ...state.profile, family_members: updated }
+    dispatch({ type: 'SET_PROFILE', profile: newProfile })
+    try { await profileAPI.update(state.user.id, { family_members: updated }) }
+    catch (err) { addToast('Erro ao salvar membro', 'error') }
+  }
+
+  const removeFamilyMember = async (id) => {
+    const existing = state.profile?.family_members || []
+    const updated = existing.filter(m => m.id !== id)
+    const newProfile = { ...state.profile, family_members: updated }
+    dispatch({ type: 'SET_PROFILE', profile: newProfile })
+    try { await profileAPI.update(state.user.id, { family_members: updated }) }
+    catch (err) { addToast('Erro ao remover membro', 'error') }
+  }
+
   const value = {
     state, dispatch, addToast,
     login, signup, logout, resetPwd, updatePwd,
@@ -510,6 +530,7 @@ export function AppProvider({ children }) {
     addWorker, updateWorker, deleteWorker, updateWorkerItem,
     upsertVPL, deleteVPL,
     updateIncome, addCustomCategory, removeCustomCategory,
+    addFamilyMember, removeFamilyMember,
     loadUserData,
   }
 

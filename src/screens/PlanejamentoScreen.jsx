@@ -482,6 +482,61 @@ function DiagnosticoTab({ goals, transactions, income }) {
   )
 }
 
+
+// ─── FAMÍLIA TAB ─────────────────────────────────────────────
+function FamiliaTab() {
+  const { state, addFamilyMember, removeFamilyMember } = useApp()
+  const members = state.profile?.family_members || []
+  const [name, setName] = React.useState('')
+
+  const handleAdd = async () => {
+    if (!name.trim()) return
+    await addFamilyMember(name.trim())
+    setName('')
+  }
+
+  return (
+    <div style={{ paddingTop: 12 }}>
+      <div className="card">
+        <div className="card-title" style={{ marginBottom: 12 }}>👨‍👩‍👧 Membros da Família</div>
+        <p style={{ fontSize: 13, color: 'var(--cinza)', marginBottom: 16 }}>
+          Cadastre os membros para identificar quem é o responsável de cada gasto ou receita.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <input
+            className="input"
+            style={{ flex: 1 }}
+            placeholder="Nome do membro"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          />
+          <button className="btn btn-dark" onClick={handleAdd}>+ Adicionar</button>
+        </div>
+        {members.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--cinza)', fontSize: 13 }}>
+            Nenhum membro cadastrado ainda
+          </div>
+        ) : (
+          <div>
+            {members.map(m => (
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, marginBottom: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff' }}>
+                    {m.name[0].toUpperCase()}
+                  </div>
+                  <span style={{ fontWeight: 600, fontSize: 15 }}>{m.name}</span>
+                </div>
+                <button onClick={() => removeFamilyMember(m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 18 }}>🗑</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function PlanejamentoScreen() {
   const { state, dispatch, updateGoal, updateIncome } = useApp()
   const { goals, transactions, profile, selM, selY } = state
@@ -524,7 +579,7 @@ export default function PlanejamentoScreen() {
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12 }}>
-          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos'], ['receita', '💰 Receita']].map(([id, label]) => (
+          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos'], ['receita', '💰 Receita'], ['familia', '👨‍👩‍👧 Família']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -715,6 +770,9 @@ export default function PlanejamentoScreen() {
 
         {/* RECEITA PREVISTA */}
         {subTab === 'receita' && <ReceitaPrevistaTab />}
+
+        {/* FAMÍLIA */}
+        {subTab === 'familia' && <FamiliaTab />}
 
       </div>
     </div>

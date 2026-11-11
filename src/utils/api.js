@@ -59,11 +59,14 @@ export const goalsAPI = {
 }
 
 export const lotsAPI = {
-  getAll: async (userId) =>
-    handle(supabase.from('lots').select(`
+  getAll: async (userId, month) => {
+    let q = supabase.from('lots').select(`
       *, lot_items(*), lot_expenses(*),
       workers(*, worker_items(*))
-    `).eq('user_id', userId).order('created_at')),
+    `).eq('user_id', userId).order('created_at')
+    if (month) q = q.eq('month', month)
+    return handle(q)
+  },
   create: async (lot) => {
     const { data, error } = await supabase.from('lots').insert(lot).select().single()
     if (error) throw error

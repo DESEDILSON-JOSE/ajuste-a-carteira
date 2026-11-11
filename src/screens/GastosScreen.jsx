@@ -59,7 +59,7 @@ export default function GastosScreen() {
   const [month, setMonth] = useState(now.getMonth())
   const [year, setYear] = useState(now.getFullYear())
   const [activeTab, setActiveTab] = useState('essencial')
-  const [form, setForm] = useState({ desc: '', value: '', category: 'Outros', date: todayStr() })
+  const [form, setForm] = useState({ desc: '', value: '', category: 'Outros', date: todayStr(), member: '' })
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -101,8 +101,9 @@ export default function GastosScreen() {
         account: 'Dinheiro',
         paid: true,
         spending_type: activeTab,
+        member: form.member || null,
       })
-      setForm({ desc: '', value: '', category: 'Outros', date: todayStr() })
+      setForm({ desc: '', value: '', category: 'Outros', date: todayStr(), member: '' })
       setAdding(false)
     } catch (_) {}
     setSaving(false)
@@ -184,7 +185,10 @@ export default function GastosScreen() {
               <div style={{ fontSize: 11, color: '#94a3b8' }}>{tx.category} · {tx.date}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#dc2626' }}>{R$(parseFloat(tx.value) || 0)}</span>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#dc2626' }}>{R$(parseFloat(tx.value) || 0)}</div>
+                {tx.member && <div style={{ fontSize: 10, color: 'var(--cinza)' }}>👤 {tx.member}</div>}
+              </div>
               <button onClick={() => deleteTx(tx.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 15 }}>🗑</button>
             </div>
           </div>
@@ -205,9 +209,17 @@ export default function GastosScreen() {
             </div>
             <select className="input" value={form.category}
               onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-              style={{ marginBottom: 12 }}>
+              style={{ marginBottom: 8 }}>
               {CATS.map(c => <option key={c}>{c}</option>)}
             </select>
+            {(state.profile?.family_members || []).length > 0 && (
+              <select className="input" value={form.member}
+                onChange={e => setForm(f => ({ ...f, member: e.target.value }))}
+                style={{ marginBottom: 12 }}>
+                <option value="">Para quem? (opcional)</option>
+                {(state.profile?.family_members || []).map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-dark" style={{ flex: 1, background: tab.color }} onClick={handleAdd} disabled={saving}>
                 {saving ? 'Salvando…' : '✓ Salvar'}
