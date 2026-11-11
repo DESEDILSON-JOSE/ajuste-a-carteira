@@ -123,10 +123,10 @@ function GastosFixosTabP() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 12, marginBottom: editingFixo?.recurring_id === f.recurring_id ? 0 : 10, border: '1px solid rgba(255,255,255,0.08)' }}>
                 <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
-                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{f.category} · dia {f.dueDay} · todos os meses</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.category} · dia {f.dueDay} · todos os meses</div>
                 </div>
-                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14 }}>{R$(f.value)}</span>
+                <span style={{ fontWeight: 700, color: '#f87171', fontSize: 14, flexShrink: 0 }}>{R$(f.value)}</span>
                 <button onClick={() => editingFixo?.recurring_id === f.recurring_id ? setEditingFixo(null) : startEdit(f)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
                 <button onClick={() => remove(f.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}>🗑</button>
               </div>
@@ -286,8 +286,8 @@ function ReceitaPrevistaTab() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 12, marginBottom: editingId?.recurring_id === r.recurring_id ? 0 : 10, border: '1px solid rgba(255,255,255,0.08)' }}>
                 <span style={{ fontSize: 20 }}>{RECEITA_ICONS[r.category] || '💰'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.description}</div>
-                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{r.category} · dia {r.receiveDay} · todos os meses</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.category} · dia {r.receiveDay} · todos os meses</div>
                 </div>
                 <span style={{ fontWeight: 700, color: '#86efac', fontSize: 14 }}>{R$(r.value)}</span>
                 <button onClick={() => editingId?.recurring_id === r.recurring_id ? setEditingId(null) : startEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
