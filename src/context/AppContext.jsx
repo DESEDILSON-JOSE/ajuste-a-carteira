@@ -258,6 +258,28 @@ export function AppProvider({ children }) {
     } catch (err) { addToast(err.message, 'error') }
   }
 
+  const addReceitaFixa = async (data) => {
+    const year = new Date().getFullYear()
+    const rid = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36))
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    try {
+      const created = []
+      for (let m = 0; m < 12; m++) {
+        const day = Math.min(data.receiveDay, daysInMonth[m])
+        const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const tx = await txAPI.add({
+          type: 'income', description: data.description,
+          value: data.value, date, category: data.category,
+          account: 'Dinheiro', paid: true, notes: 'Receita fixa',
+          recurring: true, recurring_id: rid, user_id: state.user.id,
+        })
+        created.push(tx)
+      }
+      dispatch({ type: 'SET_TXS', transactions: [...created, ...state.transactions] })
+      addToast('Receita fixa adicionada!')
+    } catch (err) { addToast(err.message, 'error') }
+  }
+
   const deleteRecurringGroup = async (recurringId) => {
     dispatch({ type: 'SET_TXS', transactions: state.transactions.filter(t => t.recurring_id !== recurringId) })
     try {
@@ -446,7 +468,7 @@ export function AppProvider({ children }) {
   const value = {
     state, dispatch, addToast,
     login, signup, logout, resetPwd, updatePwd,
-    addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup, updateFixo,
+    addTx, updateTx, deleteTx, addFixo, deleteRecurringGroup, updateFixo, addReceitaFixa,
     saveBudget, deleteBudget,
     updateGoal, deleteGoal,
     addLot, updateLot,

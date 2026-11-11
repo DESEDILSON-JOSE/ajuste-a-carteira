@@ -176,6 +176,174 @@ function GastosFixosTabP() {
   )
 }
 
+const RECEITA_CATS = ['Salário','Freela','Aluguel','Dividendos','Comissão','Pensão','Benefício','Outros']
+const RECEITA_ICONS = {'Salário':'💼','Freela':'💻','Aluguel':'🏠','Dividendos':'📈','Comissão':'🤝','Pensão':'👴','Benefício':'🎁','Outros':'💰'}
+
+function ReceitaPrevistaTab() {
+  const { state, addReceitaFixa, deleteRecurringGroup, updateFixo } = useApp()
+  const [form, setForm] = React.useState({ description: '', value: '', category: 'Salário', receiveDay: 5 })
+  const [showForm, setShowForm] = React.useState(false)
+  const [editingId, setEditingId] = React.useState(null)
+  const [editForm, setEditForm] = React.useState({ description: '', value: '', category: 'Salário', receiveDay: 5 })
+  const [saving, setSaving] = React.useState(false)
+
+  const receitas = React.useMemo(() => {
+    const groups = {}
+    state.transactions.filter(t => t.recurring && t.type === 'income').forEach(t => {
+      if (!groups[t.recurring_id]) {
+        const d = new Date(t.date + 'T12:00:00')
+        groups[t.recurring_id] = {
+          recurring_id: t.recurring_id,
+          description: t.description,
+          value: t.value,
+          category: t.category,
+          receiveDay: d.getDate(),
+        }
+      }
+    })
+    return Object.values(groups)
+  }, [state.transactions])
+
+  const totalMensal = receitas.reduce((s, r) => s + r.value, 0)
+  const totalAnual = totalMensal * 12
+
+  const handleSave = async () => {
+    if (!form.description || !form.value) return
+    setSaving(true)
+    await addReceitaFixa({ ...form, value: parseFloat(form.value) })
+    setSaving(false)
+    setForm({ description: '', value: '', category: 'Salário', receiveDay: 5 })
+    setShowForm(false)
+  }
+
+  const startEdit = (r) => {
+    setEditingId(r)
+    setEditForm({ description: r.description, value: String(r.value), category: r.category, receiveDay: r.receiveDay })
+  }
+
+  const handleUpdate = async () => {
+    if (!editForm.value) return
+    setSaving(true)
+    await updateFixo(editingId.recurring_id, { ...editForm, value: parseFloat(editForm.value), dueDay: editForm.receiveDay })
+    setSaving(false)
+    setEditingId(null)
+  }
+
+  return (
+    <div>
+      <div className="g2" style={{ marginBottom: 12 }}>
+        <div className="stat">
+          <div className="stat-label">Total Mensal</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#22c55e' }}>{R$(totalMensal)}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Total Anual</div>
+          <div className="stat-value" style={{ fontSize: 16, color: '#22c55e' }}>{R$(totalAnual)}</div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: '#86efac', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <span>💡</span>
+        <span>Cadastre aqui sua receita mensal previsível (salário, freela recorrente, aluguel). Ela será lançada automaticamente em <strong>todos os 12 meses do ano</strong>.</span>
+      </div>
+
+      {showForm ? (
+        <div className="card">
+          <div className="card-title">Nova Receita Fixa</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label className="label">Descrição</label>
+              <input className="input" placeholder="Ex: Salário CLT, Freela mensal..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="g2">
+              <div>
+                <label className="label">Valor (R$)</label>
+                <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Recebe dia</label>
+                <input className="input" type="number" min="1" max="31" value={form.receiveDay} onChange={e => setForm(f => ({ ...f, receiveDay: parseInt(e.target.value) || 1 }))} />
+              </div>
+            </div>
+            <div>
+              <label className="label">Categoria</label>
+              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {RECEITA_CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 12, color: '#86efac', padding: '4px 0' }}>
+              📅 Serão criadas receitas para todos os 12 meses do ano automaticamente.
+            </div>
+            <div className="g2">
+              <button className="btn btn-ghost btn-full" onClick={() => { setShowForm(false); setForm({ description: '', value: '', category: 'Salário', receiveDay: 5 }) }}>Cancelar</button>
+              <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Receita Fixa</button>
+      )}
+
+      {receitas.length > 0 && (
+        <div className="card">
+          {receitas.map(r => (
+            <div key={r.recurring_id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: editingId?.recurring_id === r.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 20 }}>{RECEITA_ICONS[r.category] || '💰'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{r.category} · dia {r.receiveDay} · todos os meses</div>
+                </div>
+                <span style={{ fontWeight: 700, color: '#86efac', fontSize: 14 }}>{R$(r.value)}</span>
+                <button onClick={() => editingId?.recurring_id === r.recurring_id ? setEditingId(null) : startEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 }}>✏️</button>
+                <button onClick={() => deleteRecurringGroup(r.recurring_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}>🗑</button>
+              </div>
+              {editingId?.recurring_id === r.recurring_id && (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 11, color: '#86efac', marginBottom: 2 }}>✏️ Atualiza apenas meses a partir de hoje</div>
+                  <div>
+                    <label className="label">Descrição</label>
+                    <input className="input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+                  </div>
+                  <div className="g2">
+                    <div>
+                      <label className="label">Novo valor (R$)</label>
+                      <input className="input" type="number" inputMode="decimal" value={editForm.value} onChange={e => setEditForm(f => ({ ...f, value: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="label">Recebe dia</label>
+                      <input className="input" type="number" min="1" max="31" value={editForm.receiveDay} onChange={e => setEditForm(f => ({ ...f, receiveDay: parseInt(e.target.value) || 1 }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Categoria</label>
+                    <select className="input" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
+                      {RECEITA_CATS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="g2">
+                    <button className="btn btn-ghost btn-full" onClick={() => setEditingId(null)}>Cancelar</button>
+                    <button className="btn btn-dark btn-full" onClick={handleUpdate} disabled={saving}>{saving ? 'Salvando...' : 'Atualizar'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {receitas.length === 0 && !showForm && (
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--cinza)' }}>
+          <div style={{ fontSize: 40 }}>💰</div>
+          <div style={{ marginTop: 8 }}>Nenhuma receita fixa cadastrada</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Cadastre seu salário ou receitas mensais previsíveis</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 const PILARES = [
   { id: 'obrig', label: '🏠 Obrigatórias', pct: 50, cats: ['Alimentação','Supermercado','Açougue','Padaria','Restaurante','Habitação','Transporte','Transporte e Comunicação','Saúde','Saúde e Cuidados','Utilities','Seguros','Pet','Assinaturas'] },
   { id: 'invest', label: '💰 Investimentos', pct: 20, cats: [] },
@@ -358,12 +526,12 @@ export default function PlanejamentoScreen() {
     <div>
       <div className="hdr hdr-purple">
         <h1>Planejamento Financeiro</h1>
-        <p>Objetivos · Pilares · FIRE · Diagnóstico · Fixos</p>
+        <p>Objetivos · Pilares · FIRE · Diagnóstico · Fixos · Receita</p>
       </div>
 
       <div style={{ padding: '0 16px' }}>
         <div className="tabs" style={{ marginTop: 12 }}>
-          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos']].map(([id, label]) => (
+          {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos'], ['receita', '💰 Receita']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
@@ -551,6 +719,9 @@ export default function PlanejamentoScreen() {
 
         {/* GASTOS FIXOS */}
         {subTab === 'fixos' && <GastosFixosTabP />}
+
+        {/* RECEITA PREVISTA */}
+        {subTab === 'receita' && <ReceitaPrevistaTab />}
 
       </div>
     </div>
