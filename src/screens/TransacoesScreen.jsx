@@ -181,7 +181,7 @@ export default function TransacoesScreen() {
               const borderColor = showGreen ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.5)'
               const bgColor = showGreen ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.07)'
               return (
-                <div key={t.id} className="tx-item" style={{ borderLeft: '3px solid ' + borderColor, background: bgColor, borderRadius: 10, marginBottom: 6, padding: '8px 10px' }}>
+                <div key={t.id} className="tx-item" style={{ borderLeft: '3px solid ' + borderColor, background: bgColor, borderRadius: 10, marginBottom: 10, padding: '12px 14px' }}>
                   <button className="tx-avatar" title="Alternar pago" onClick={() => updateTx(t.id, { paid: !t.paid })}
                     style={{ background: isInc ? 'rgba(74,222,128,0.15)' : isPaid ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)', borderRadius: 10 }}>
                     {CAT_ICON[t.category] || '📌'}

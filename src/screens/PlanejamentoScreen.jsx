@@ -120,7 +120,7 @@ function GastosFixosTabP() {
         <div className="card">
           {fixos.map(f => (
             <div key={f.recurring_id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: editingFixo?.recurring_id === f.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0', borderBottom: editingFixo?.recurring_id === f.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.09)' }}>
                 <span style={{ fontSize: 20 }}>{FIXOS_ICONS[f.category] || '📌'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{f.description}</div>
@@ -283,7 +283,7 @@ function ReceitaPrevistaTab() {
         <div className="card">
           {receitas.map(r => (
             <div key={r.recurring_id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: editingId?.recurring_id === r.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0', borderBottom: editingId?.recurring_id === r.recurring_id ? 'none' : '1px solid rgba(255,255,255,0.09)' }}>
                 <span style={{ fontSize: 20 }}>{RECEITA_ICONS[r.category] || '💰'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{r.description}</div>

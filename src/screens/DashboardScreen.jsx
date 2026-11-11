@@ -205,7 +205,7 @@ export default function DashboardScreen() {
           <div className="card" style={{ borderColor: '#ef4444', borderWidth: 1 }}>
             <div className="card-title" style={{ color: '#dc2626' }}>⚠️ Despesas atrasadas ({overdue.length})</div>
             {overdue.slice(0, 3).map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 6 }}>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 10 }}>
                 <span>{t.description}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: '#dc2626', fontWeight: 600 }}>{R$(t.value)}</span>
@@ -220,7 +220,7 @@ export default function DashboardScreen() {
           <div className="card" style={{ borderColor: '#f59e0b', borderWidth: 1 }}>
             <div className="card-title" style={{ color: '#b45309' }}>📅 Vence hoje ({dueToday.length})</div>
             {dueToday.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 6 }}>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 10 }}>
                 <span>{t.description}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: '#b45309', fontWeight: 600 }}>{R$(t.value)}</span>

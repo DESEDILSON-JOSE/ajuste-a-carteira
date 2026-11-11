@@ -314,7 +314,7 @@ function DreTab({ lots, userId }) {
           }
           if (row.type === 'auto') {
             return (
-              <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: row.color, borderRadius: 8, marginBottom: 10 }}>
+              <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 14px', background: row.color, borderRadius: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{row.label}</span>
                 <span style={{ fontWeight: 700, color: '#dc2626' }}>{R$(cmv)}</span>
               </div>
@@ -323,7 +323,7 @@ function DreTab({ lots, userId }) {
           // calc
           const val = calc[row.key]
           return (
-            <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', background: row.color, borderRadius: 8, marginBottom: 10 }}>
+            <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 14px', background: row.color, borderRadius: 8, marginBottom: 12 }}>
               <span style={{ fontSize: row.big ? 15 : 13, fontWeight: 700 }}>{row.label}</span>
               <span style={{ fontSize: row.big ? 18 : 14, fontWeight: 700, color: val >= 0 ? '#15803d' : '#dc2626' }}>{R$(val)}</span>
             </div>
