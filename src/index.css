@@ -19,7 +19,7 @@
 }
 
 html { background: #0f172a; }
-#root { background: linear-gradient(160deg, #0f172a 0%, #0f2744 55%, #0f172a 100%); min-height: 100vh; }
+#root { background: #0f172a; min-height: 100vh; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {
