@@ -458,6 +458,19 @@ export function AppProvider({ children }) {
     } catch (err) { addToast(err.message, 'error') }
   }
 
+  const addCustomCategory = async (type, name) => {
+    const field = type === 'income' ? 'custom_income_cats' : 'custom_expense_cats'
+    const existing = state.profile?.[field] || []
+    if (existing.includes(name)) return
+    const updated = [...existing, name]
+    const newProfile = { ...state.profile, [field]: updated }
+    dispatch({ type: 'SET_PROFILE', profile: newProfile })
+    try {
+      await profileAPI.update(state.user.id, { [field]: updated })
+      addToast(`Categoria "${name}" adicionada!`)
+    } catch (err) { addToast('Erro ao salvar categoria', 'error') }
+  }
+
   const updateIncome = async (val) => {
     const income = parseFloat(val) || 0
     dispatch({ type: 'SET_PROFILE', profile: { ...state.profile, income } })
@@ -476,7 +489,7 @@ export function AppProvider({ children }) {
     addExpense, deleteExpense,
     addWorker, updateWorker, deleteWorker, updateWorkerItem,
     upsertVPL, deleteVPL,
-    updateIncome,
+    updateIncome, addCustomCategory,
     loadUserData,
   }
 

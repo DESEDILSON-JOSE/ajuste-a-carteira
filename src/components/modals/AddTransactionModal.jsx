@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
+import CategorySelect from '../CategorySelect'
 import { CATS_EXPENSE, CATS_INCOME, ACCOUNTS, todayStr, R$ } from '../../utils/formatters'
 
 const TYPES = [
@@ -180,9 +181,12 @@ export default function AddTransactionModal() {
 
           <div>
             <label className="label">Categoria</label>
-            <select className="input" value={form.category} onChange={e => set('category', e.target.value)}>
-              {cats.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <CategorySelect
+              type={type === 'income' ? 'income' : 'expense'}
+              baseList={cats}
+              value={form.category}
+              onChange={v => set('category', v)}
+            />
           </div>
 
           {members.length > 0 ? (

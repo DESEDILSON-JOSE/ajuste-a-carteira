@@ -1,5 +1,6 @@
 // v2
 import React, { useState, useMemo } from 'react'
+import CategorySelect from '../components/CategorySelect'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { R$, pct, MONTHS } from '../utils/formatters'
@@ -100,9 +101,7 @@ function GastosFixosTabP() {
             </div>
             <div>
               <label className="label">Categoria</label>
-              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
+              <CategorySelect type="expense" baseList={FIXOS_CATS} value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
             </div>
             <div style={{ fontSize: 12, color: '#60a5fa', padding: '4px 0' }}>
               📅 Serão criadas despesas para todos os 12 meses do ano automaticamente.
@@ -150,9 +149,7 @@ function GastosFixosTabP() {
                   </div>
                   <div>
                     <label className="label">Categoria</label>
-                    <select className="input" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
-                      {FIXOS_CATS.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <CategorySelect type="expense" baseList={FIXOS_CATS} value={editForm.category} onChange={v => setEditForm(f => ({ ...f, category: v }))} />
                   </div>
                   <div className="g2">
                     <button className="btn btn-ghost btn-full" onClick={() => setEditingFixo(null)}>Cancelar</button>
@@ -267,9 +264,7 @@ function ReceitaPrevistaTab() {
             </div>
             <div>
               <label className="label">Categoria</label>
-              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {RECEITA_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
+              <CategorySelect type="income" baseList={RECEITA_CATS} value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} />
             </div>
             <div style={{ fontSize: 12, color: '#86efac', padding: '4px 0' }}>
               📅 Serão criadas receitas para todos os 12 meses do ano automaticamente.
@@ -317,9 +312,7 @@ function ReceitaPrevistaTab() {
                   </div>
                   <div>
                     <label className="label">Categoria</label>
-                    <select className="input" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
-                      {RECEITA_CATS.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <CategorySelect type="income" baseList={RECEITA_CATS} value={editForm.category} onChange={v => setEditForm(f => ({ ...f, category: v }))} />
                   </div>
                   <div className="g2">
                     <button className="btn btn-ghost btn-full" onClick={() => setEditingId(null)}>Cancelar</button>
