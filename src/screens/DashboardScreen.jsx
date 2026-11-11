@@ -192,25 +192,26 @@ export default function DashboardScreen() {
       {/* Header */}
       <div className="hdr hdr-dark">
         <UserHeader />
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
           <div className="period-sel" style={{ justifyContent: 'center', marginBottom: 8 }}>
             <button onClick={() => changeMonth(-1)}>‹</button>
             <span>{MONTHS[selM - 1]} {selY}</span>
             <button onClick={() => changeMonth(1)}>›</button>
           </div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: balance >= 0 ? '#4ade80' : '#f87171' }}>{balance >= 0 ? '+' : ''}{R$(balance)}</div>
-          <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>Saldo do mês</div>
-          <div style={{ fontSize: 12, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171', marginBottom: 8 }}>
-            {R$(cumulativeBalance)} <span style={{ color: 'var(--cinza)', fontWeight: 400 }}>acumulado</span>
+          <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-1px', color: balance >= 0 ? '#4ade80' : '#f87171', lineHeight: 1.1, marginBottom: 4 }}>{balance >= 0 ? '+' : ''}{R$(balance)}</div>
+          <div style={{ fontSize: 11, opacity: .55, marginBottom: 10, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Saldo do mês</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 12px', marginBottom: 14 }}>
+            <span style={{ fontSize: 12, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171', fontWeight: 700 }}>{R$(cumulativeBalance)}</span>
+            <span style={{ color: 'var(--cinza)', fontWeight: 400, fontSize: 11 }}>acumulado</span>
           </div>
-          <div className="g2" style={{ gap: 8 }}>
-            <div style={{ background: 'rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 2 }}>↑ Receitas</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{R$(totalIncome)}</div>
+          <div className="g2" style={{ gap: 10 }}>
+            <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 12, padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 4, fontWeight: 600, letterSpacing: '0.3px' }}>↑ RECEITAS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{R$(totalIncome)}</div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, color: '#f87171', marginBottom: 2 }}>↓ Despesas</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{R$(totalExpense)}</div>
+            <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 12, padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, color: '#f87171', marginBottom: 4, fontWeight: 600, letterSpacing: '0.3px' }}>↓ DESPESAS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{R$(totalExpense)}</div>
             </div>
           </div>
           {variation !== 0 && (
@@ -221,7 +222,7 @@ export default function DashboardScreen() {
         </div>
       </div>
 
-      <div style={{ padding: '0 16px' }}>
+      <div style={{ padding: '16px 16px 0' }}>
         {/* Alertas */}
         {overdue.length > 0 && (
           <div className="card" style={{ borderColor: '#ef4444', borderWidth: 1 }}>

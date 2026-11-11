@@ -14,6 +14,8 @@
   --text: #f1f5f9; --text-sub: #94a3b8;
   --white: #ffffff;
   --r: 16px; --r-sm: 10px; --r-lg: 24px;
+  --card: rgba(255,255,255,0.07);
+  --card-hover: rgba(255,255,255,0.11);
 }
 
 html { background: #0f172a; }
@@ -42,12 +44,12 @@ body {
   border-radius: var(--r);
   border: 1px solid var(--glass-border);
   padding: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .card-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 12px; }
 
 /* HEADERS */
-.hdr { padding: 22px 16px 18px; color: #fff; }
+.hdr { padding: 20px 16px 24px; color: #fff; }
 .hdr h1 { font-size: 18px; font-weight: 700; }
 .hdr p { font-size: 12px; opacity: .65; margin-top: 3px; }
 .hdr-dark { background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,58,95,0.85)); }
@@ -161,6 +163,9 @@ input[type="checkbox"] { accent-color: var(--azul); width: 16px; height: 16px; c
 /* LOADING SCREEN */
 .loading-screen { position: fixed; inset: 0; background: var(--escuro); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 500; }
 .loading-screen .title { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 3px; }
+
+/* CONTENT AREA */
+.content-wrap { padding: 16px 16px 0; }
 
 /* SECTION */
 .section { padding: 0 16px; margin-bottom: 20px; }

@@ -74,10 +74,10 @@ export default function TransacoesScreen() {
         <input className="input" placeholder="🔍 Buscar..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'rgba(255,255,255,.12)', color: '#fff', border: '0.5px solid rgba(255,255,255,.2)' }} />
       </div>
 
-      <div style={{ padding: '0 16px' }}>
+      <div style={{ padding: '16px 16px 0' }}>
         {/* Seletor de ano */}
         {years.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
             {years.map(y => (
               <button key={y}
                 onClick={() => { setSelectedYear(y); setMonthFilter(y + '-' + String(new Date().getMonth()+1).padStart(2,'0')) }}

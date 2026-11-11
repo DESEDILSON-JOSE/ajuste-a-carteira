@@ -1373,7 +1373,7 @@ export default function NegocioScreen() {
         <p>{bizProfile?.name || 'Configure seu negócio'} · {bizProfile?.type || 'Gestão Empresarial'}</p>
       </div>
 
-      <div style={{ padding: '0 16px' }}>
+      <div style={{ padding: '16px 16px 0' }}>
         <div style={{ overflowX: 'auto', marginTop: 12, paddingBottom: 2 }}>
           <div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
             {NEG_TABS.map(([id, label]) => (

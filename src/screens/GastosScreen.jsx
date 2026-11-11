@@ -164,7 +164,7 @@ export default function GastosScreen() {
       </div>
 
       {/* Tab content */}
-      <div style={{ padding: '0 16px 120px' }}>
+      <div style={{ padding: '16px 16px 120px' }}>
         <div style={{ background: tab.bg, border: `1px solid ${tab.border}`, borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: tab.color }}>{tab.icon} {tab.label} <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.8 }}>· {tab.sub}</span></div>
           <div style={{ fontSize: 12, color: tab.color, opacity: 0.75, marginTop: 2 }}>{tab.desc}</div>

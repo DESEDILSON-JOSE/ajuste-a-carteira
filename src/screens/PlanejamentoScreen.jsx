@@ -577,8 +577,8 @@ export default function PlanejamentoScreen() {
         <p>Objetivos · Pilares · FIRE · Diagnóstico · Fixos · Receita</p>
       </div>
 
-      <div style={{ padding: '0 16px' }}>
-        <div className="tabs" style={{ marginTop: 12 }}>
+      <div style={{ padding: '16px 16px 0' }}>
+        <div className="tabs" style={{ marginTop: 0 }}>
           {[['objetivos', 'Objetivos'], ['pilares', 'Pilares'], ['fire', 'FIRE'], ['diagnostico', '🩺 Diagnóstico'], ['fixos', '🏷️ Fixos'], ['receita', '💰 Receita'], ['familia', '👨‍👩‍👧 Família']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} onClick={() => setSubTab(id)}>{label}</button>
           ))}

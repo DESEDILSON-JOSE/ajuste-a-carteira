@@ -1214,7 +1214,7 @@ export default function RelatoriosScreen() {
         <p>7 dias · Mensal · Anual · Fixos · Orçamento · Contas</p>
       </div>
 
-      <div style={{ padding: '0 16px' }}>
+      <div style={{ padding: '16px 16px 0' }}>
         <div className="tabs" style={{ marginTop: 12, overflowX: 'auto', flexWrap: 'nowrap' }}>
           {[['babilonia', '🏛️ Babilônia'], ['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} style={{ flex: 'none', minWidth: 'max-content', padding: '9px 12px' }} onClick={() => setSubTab(id)}>{label}</button>
