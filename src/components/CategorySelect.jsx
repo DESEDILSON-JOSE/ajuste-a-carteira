@@ -57,16 +57,6 @@ export default function CategorySelect({ type, value, onChange, baseList }) {
         </div>
       )}
 
-      {customCats.length > 0 && !adding && (
-        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {customCats.map(c => (
-            <span key={c} style={{ fontSize: 10, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 20, padding: '2px 8px', color: '#c4b5fd', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {c}
-              <button onClick={() => handleDelete(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 10, padding: 0, lineHeight: 1 }}>✕</button>
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
