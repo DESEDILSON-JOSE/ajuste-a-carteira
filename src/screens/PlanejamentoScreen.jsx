@@ -113,7 +113,7 @@ function GastosFixosTabP() {
           </div>
         </div>
       ) : (
-        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Gasto Fixo</button>
+        <button className="btn btn-dark btn-full" style={{ marginBottom: 16 }} onClick={() => setShowForm(true)}>+ Adicionar Gasto Fixo</button>
       )}
 
       {fixos.length > 0 && (
