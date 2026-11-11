@@ -93,22 +93,6 @@ function UserCard({ user, onApprove, onReject }) {
           </button>
         )}
       </div>
-    {/* ZERAR DADOS */}
-      <div style={{ marginTop: 32, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 16, padding: '20px 18px' }}>
-        <h2 style={{ color: '#f87171', fontSize: 16, fontWeight: 700, margin: '0 0 8px 0' }}>⚠️ Zerar meus dados</h2>
-        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 16px 0', lineHeight: 1.6 }}>
-          Apaga <strong style={{ color: '#f87171' }}>permanentemente</strong> todas as suas transações, gastos fixos, lotes de facção, metas, DRE e projetos VPL. Essa ação não pode ser desfeita.
-        </p>
-        <button
-          disabled={resetting}
-          onClick={() => {
-            if (window.confirm('Tem certeza? Isso apaga TODOS os seus dados. Não há como recuperar.')) resetMyData()
-          }}
-          style={{ background: '#ef4444', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, padding: '12px 24px', cursor: resetting ? 'default' : 'pointer', opacity: resetting ? 0.6 : 1, width: '100%' }}
-        >
-          {resetting ? 'Zerando...' : '🗑️ Zerar todos os meus dados'}
-        </button>
-      </div>
     </div>
   )
 }
@@ -274,6 +258,22 @@ export default function AdminScreen() {
           />
         ))
       )}
+      {/* ZERAR DADOS */}
+      <div style={{ marginTop: 32, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 16, padding: '20px 18px' }}>
+        <h2 style={{ color: '#f87171', fontSize: 16, fontWeight: 700, margin: '0 0 8px 0' }}>⚠️ Zerar meus dados</h2>
+        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 16px 0', lineHeight: 1.6 }}>
+          Apaga <strong style={{ color: '#f87171' }}>permanentemente</strong> todas as suas transações, gastos fixos, lotes de facção, metas, DRE e projetos VPL. Essa ação não pode ser desfeita.
+        </p>
+        <button
+          disabled={resetting}
+          onClick={() => {
+            if (window.confirm('Tem certeza? Isso apaga TODOS os seus dados. Não há como recuperar.')) resetMyData()
+          }}
+          style={{ background: '#ef4444', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, padding: '12px 24px', cursor: resetting ? 'default' : 'pointer', opacity: resetting ? 0.6 : 1, width: '100%' }}
+        >
+          {resetting ? 'Zerando...' : '🗑️ Zerar todos os meus dados'}
+        </button>
+      </div>
     </div>
   )
 }
