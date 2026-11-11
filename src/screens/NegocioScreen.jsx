@@ -1,9 +1,838 @@
-import { useState, useMemo } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine, PieChart, Pie, Cell } from 'recharts'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { R$, pct, todayStr, MONTHS } from '../utils/formatters'
 import { calcVPL, calcTIR, calcPayback, calcIL } from '../utils/calculations'
 import { dreAPI, vplAPI } from '../utils/api'
+import { bizAPI } from '../utils/bizAPI'
+
+// ─── CONSTANTS ──────────────────────────────────────────────
+const BIZ_TYPES = ['MEI', 'Empresa', 'Autônomo', 'Facção', 'Freelancer', 'Startup', 'Comércio', 'Indústria']
+const BIZ_SEGMENTS = ['Moda/Confecção', 'Alimentação', 'Tecnologia', 'Serviços Gerais', 'Comércio', 'Saúde/Bem-estar', 'Educação', 'Construção', 'Beleza/Estética', 'Transporte', 'Agropecuária', 'Outro']
+const PAYMENT_METHODS = ['Pix', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Boleto', 'Cheque', 'Fiado']
+const SALE_STATUS = { pending: { label: 'Pendente', color: '#f59e0b' }, paid: { label: 'Pago', color: '#4ade80' }, cancelled: { label: 'Cancelado', color: '#ef4444' } }
+const CF_CATS_IN = ['Venda', 'Serviço', 'Comissão', 'Aluguel Recebido', 'Empréstimo', 'Outro']
+const CF_CATS_OUT = ['Fornecedor', 'Aluguel', 'Salário', 'Marketing', 'Equipamento', 'Imposto/Taxa', 'Energia', 'Internet', 'Transporte', 'Outros']
+const UNITS = ['un', 'kg', 'g', 'L', 'ml', 'm', 'm²', 'caixa', 'par', 'rolo', 'h']
+
+const nowMonth = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const monthLabel = (m) => {
+  if (!m) return ''
+  const [y, mo] = m.split('-')
+  return `${MONTHS[parseInt(mo) - 1]}/${y}`
+}
+const monthOptions = () => {
+  const opts = []
+  for (let i = 0; i < 12; i++) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    opts.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  return opts
+}
+
+// ─── VISÃO GERAL TAB ─────────────────────────────────────────
+function VisaoGeralTab({ biz }) {
+  const [selMonth, setSelMonth] = useState(nowMonth())
+  const { profile, sales, cashflow } = biz
+
+  const monthSales = useMemo(() => sales.filter(s => s.date?.startsWith(selMonth)), [sales, selMonth])
+  const paidSales = useMemo(() => monthSales.filter(s => s.status === 'paid'), [monthSales])
+  const cfMonth = useMemo(() => cashflow.filter(cf => cf.date?.startsWith(selMonth)), [cashflow, selMonth])
+
+  const salesRevenue = paidSales.reduce((s, x) => s + (parseFloat(x.total) || 0), 0)
+  const pendingRevenue = monthSales.filter(s => s.status === 'pending').reduce((s, x) => s + (parseFloat(x.total) || 0), 0)
+  const cfIncome = cfMonth.filter(cf => cf.type === 'entrada').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
+  const cfExpense = cfMonth.filter(cf => cf.type === 'saida').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
+
+  const totalRevenue = salesRevenue + cfIncome
+  const totalExpense = cfExpense
+  const profit = totalRevenue - totalExpense
+  const goal = parseFloat(profile?.monthly_goal) || 0
+  const goalPct = goal > 0 ? Math.min(100, (totalRevenue / goal) * 100) : 0
+
+  const productRevMap = {}
+  paidSales.forEach(sale => {
+    ;(sale.biz_sale_items || []).forEach(item => {
+      const name = item.product_name || 'Sem nome'
+      productRevMap[name] = (productRevMap[name] || 0) + (parseFloat(item.total) || 0)
+    })
+  })
+  const topProducts = Object.entries(productRevMap)
+    .sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([name, value]) => ({ name: name.length > 14 ? name.slice(0, 14) + '…' : name, value }))
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <select className="input" value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+          {monthOptions().map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+      </div>
+
+      <div className="g2" style={{ marginBottom: 10, gap: 10 }}>
+        <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Receita Paga</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#4ade80' }}>{R$(totalRevenue)}</div>
+          {pendingRevenue > 0 && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>+ {R$(pendingRevenue)} pendente</div>}
+        </div>
+        <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Despesas</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#f87171' }}>{R$(totalExpense)}</div>
+        </div>
+      </div>
+
+      <div style={{ background: profit >= 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', border: `1px solid ${profit >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 12, padding: '14px 16px', textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Lucro Líquido</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: profit >= 0 ? '#4ade80' : '#f87171' }}>{R$(profit)}</div>
+      </div>
+
+      {goal > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+            <span>Meta mensal</span>
+            <span style={{ fontWeight: 600 }}>{R$(totalRevenue)} / {R$(goal)}</span>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 100, height: 8, overflow: 'hidden' }}>
+            <div style={{ background: goalPct >= 100 ? '#4ade80' : '#3b82f6', width: `${goalPct}%`, height: '100%', borderRadius: 100, transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, textAlign: 'right' }}>{goalPct.toFixed(0)}% da meta</div>
+        </div>
+      )}
+
+      {topProducts.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card-title">🏆 Top Produtos/Serviços</div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={topProducts} layout="vertical" margin={{ left: 0, right: 20 }}>
+              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+              <Tooltip formatter={v => [R$(v), 'Receita']} />
+              <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {monthSales.length > 0 && (
+        <div className="card">
+          <div className="card-title">🛒 Vendas do Mês ({monthSales.length})</div>
+          {monthSales.slice(0, 8).map(sale => {
+            const st = SALE_STATUS[sale.status] || SALE_STATUS.pending
+            return (
+              <div key={sale.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{sale.client_name || 'Cliente Avulso'}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{sale.date} · {sale.payment_method}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, color: '#4ade80' }}>{R$(sale.total)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: st.color }}>{st.label}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {monthSales.length === 0 && cfMonth.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40 }}>📊</div>
+          <div style={{ marginTop: 8, fontWeight: 600 }}>Sem movimentação neste mês</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Registre vendas e lançamentos no Caixa</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── NEGÓCIO SETUP TAB ───────────────────────────────────────
+function NegocioSetupTab({ biz }) {
+  const { profile, userId, reload, addToast } = biz
+  const [form, setForm] = useState({ name: '', type: 'MEI', segment: 'Moda/Confecção', cnpj: '', monthly_goal: '' })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        name: profile.name || '',
+        type: profile.type || 'MEI',
+        segment: profile.segment || 'Moda/Confecção',
+        cnpj: profile.cnpj || '',
+        monthly_goal: profile.monthly_goal || '',
+      })
+    }
+  }, [profile])
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { addToast('Digite o nome do negócio', 'error'); return }
+    setSaving(true)
+    try {
+      await bizAPI.saveProfile(userId, { ...form, monthly_goal: parseFloat(form.monthly_goal) || 0 })
+      await reload()
+      addToast('Negócio atualizado!')
+    } catch { addToast('Erro ao salvar', 'error') }
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-title">🏢 Configuração do Negócio</div>
+        <p style={{ fontSize: 13, color: 'var(--cinza)', marginBottom: 16, lineHeight: 1.6 }}>
+          Configure as informações do seu negócio. Isso personaliza os relatórios e o painel.
+        </p>
+
+        <label className="label">Nome do Negócio *</label>
+        <input className="input" style={{ marginBottom: 12 }} placeholder="Ex: Confecção Maria, Tech Solutions..." value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+
+        <label className="label">Tipo de Negócio</label>
+        <select className="input" style={{ marginBottom: 12 }} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+          {BIZ_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <label className="label">Segmento / Nicho</label>
+        <select className="input" style={{ marginBottom: 12 }} value={form.segment} onChange={e => setForm(f => ({ ...f, segment: e.target.value }))}>
+          {BIZ_SEGMENTS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <label className="label">CNPJ / CPF (opcional)</label>
+        <input className="input" style={{ marginBottom: 12 }} placeholder="00.000.000/0001-00" value={form.cnpj} onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))} />
+
+        <label className="label">Meta Mensal de Faturamento (R$)</label>
+        <input className="input" type="number" inputMode="decimal" style={{ marginBottom: 16 }} placeholder="0,00" value={form.monthly_goal} onChange={e => setForm(f => ({ ...f, monthly_goal: e.target.value }))} />
+
+        <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>
+          {saving ? 'Salvando...' : '💾 Salvar Configurações'}
+        </button>
+      </div>
+
+      {profile && profile.name && (
+        <div className="card" style={{ marginTop: 12, background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.2)' }}>
+          <div style={{ fontSize: 24, marginBottom: 4 }}>🏢</div>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>{profile.name}</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{profile.type} · {profile.segment}</div>
+          {profile.cnpj && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{profile.cnpj}</div>}
+          {parseFloat(profile.monthly_goal) > 0 && (
+            <div style={{ fontSize: 13, color: '#60a5fa', marginTop: 6 }}>Meta: {R$(profile.monthly_goal)}/mês</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── CATÁLOGO TAB ────────────────────────────────────────────
+function CatalogoTab({ biz }) {
+  const { products, userId, reload, addToast } = biz
+  const [showAdd, setShowAdd] = useState(false)
+  const [form, setForm] = useState({ name: '', type: 'produto', price: '', cost: '', unit: 'un', stock: '' })
+  const [saving, setSaving] = useState(false)
+  const [filter, setFilter] = useState('todos')
+
+  const filtered = useMemo(() => {
+    if (filter === 'todos') return products
+    return products.filter(p => p.type === filter)
+  }, [products, filter])
+
+  const margin = (p) => parseFloat(p.price) > 0 ? ((parseFloat(p.price) - parseFloat(p.cost)) / parseFloat(p.price)) * 100 : 0
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) { addToast('Digite o nome', 'error'); return }
+    setSaving(true)
+    try {
+      await bizAPI.addProduct(userId, { ...form, price: parseFloat(form.price) || 0, cost: parseFloat(form.cost) || 0, stock: parseFloat(form.stock) || 0 })
+      setForm({ name: '', type: 'produto', price: '', cost: '', unit: 'un', stock: '' })
+      setShowAdd(false)
+      await reload()
+      addToast('Item adicionado!')
+    } catch { addToast('Erro ao salvar', 'error') }
+    setSaving(false)
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      await bizAPI.softDeleteProduct(id)
+      await reload()
+      addToast('Item removido')
+    } catch { addToast('Erro ao remover', 'error') }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {[['todos', 'Todos'], ['produto', '📦 Produtos'], ['servico', '🔧 Serviços']].map(([v, l]) => (
+          <button key={v} className={`btn btn-sm ${filter === v ? 'btn-dark' : 'btn-ghost'}`} onClick={() => setFilter(v)}>{l}</button>
+        ))}
+        <button className="btn btn-sm btn-dark" style={{ marginLeft: 'auto' }} onClick={() => setShowAdd(!showAdd)}>+ Novo</button>
+      </div>
+
+      {showAdd && (
+        <div className="card" style={{ marginBottom: 12, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.05)' }}>
+          <div className="card-title">➕ Novo Item</div>
+          <label className="label">Nome *</label>
+          <input className="input" style={{ marginBottom: 10 }} placeholder="Nome do produto/serviço" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+
+          <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+            <div>
+              <label className="label">Tipo</label>
+              <select className="input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+                <option value="produto">Produto</option>
+                <option value="servico">Serviço</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Unidade</label>
+              <select className="input" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}>
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+            <div>
+              <label className="label">Preço Venda (R$)</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Custo (R$)</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} />
+            </div>
+          </div>
+
+          {form.type === 'produto' && (
+            <div style={{ marginBottom: 10 }}>
+              <label className="label">Estoque inicial</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="0" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} />
+            </div>
+          )}
+
+          {form.price && form.cost && parseFloat(form.price) > 0 && (
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
+              Margem: <span style={{ color: ((parseFloat(form.price) - parseFloat(form.cost)) / parseFloat(form.price)) * 100 >= 30 ? '#4ade80' : '#f59e0b', fontWeight: 600 }}>
+                {(((parseFloat(form.price) - parseFloat(form.cost)) / parseFloat(form.price)) * 100).toFixed(1)}%
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-dark btn-sm" onClick={handleAdd} disabled={saving}>{saving ? '...' : '✓ Salvar'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAdd(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40 }}>📦</div>
+          <div style={{ marginTop: 8, fontWeight: 600 }}>Nenhum item cadastrado</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Clique em "+ Novo" para começar</div>
+        </div>
+      ) : (
+        filtered.map(p => {
+          const mg = margin(p)
+          return (
+            <div key={p.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '12px 14px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{p.name}</span>
+                    <span style={{ fontSize: 10, background: p.type === 'servico' ? 'rgba(139,92,246,0.2)' : 'rgba(59,130,246,0.2)', color: p.type === 'servico' ? '#a78bfa' : '#60a5fa', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      {p.type === 'servico' ? 'SERVIÇO' : 'PRODUTO'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 13, flexWrap: 'wrap' }}>
+                    <span style={{ color: '#4ade80', fontWeight: 600 }}>{R$(p.price)}</span>
+                    {parseFloat(p.cost) > 0 && <span style={{ color: '#94a3b8' }}>Custo: {R$(p.cost)}</span>}
+                    {parseFloat(p.price) > 0 && <span style={{ color: mg >= 30 ? '#4ade80' : '#f59e0b' }}>{mg.toFixed(0)}% margem</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                    {p.unit}{p.type === 'produto' && parseFloat(p.stock) > 0 ? ` · Estoque: ${p.stock}` : ''}
+                  </div>
+                </div>
+                <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, padding: '4px' }}>🗑</button>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+// ─── VENDAS TAB ──────────────────────────────────────────────
+function VendasTab({ biz }) {
+  const { sales, products, clients, userId, reload, addToast } = biz
+  const [view, setView] = useState('list')
+  const [selMonth, setSelMonth] = useState(nowMonth())
+  const [form, setForm] = useState({ client_name: '', date: todayStr(), payment_method: 'Pix', status: 'pending', notes: '' })
+  const [items, setItems] = useState([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }])
+  const [saving, setSaving] = useState(false)
+
+  const monthSales = useMemo(() => sales.filter(s => s.date?.startsWith(selMonth)), [sales, selMonth])
+  const totalSale = items.reduce((s, it) => s + ((parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0)), 0)
+
+  const handleItemChange = (idx, field, val) => {
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it
+      const updated = { ...it, [field]: val }
+      if (field === 'product_id' && val) {
+        const prod = products.find(p => p.id === val)
+        if (prod) { updated.product_name = prod.name; updated.unit_price = prod.price }
+      }
+      updated.total = (parseFloat(field === 'quantity' ? val : updated.quantity) || 0) * (parseFloat(field === 'unit_price' ? val : updated.unit_price) || 0)
+      return updated
+    }))
+  }
+
+  const addItem = () => setItems(prev => [...prev, { product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }])
+  const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
+
+  const handleSave = async () => {
+    if (totalSale <= 0) { addToast('Adicione ao menos um item', 'error'); return }
+    setSaving(true)
+    try {
+      const saleItems = items.filter(it => (parseFloat(it.quantity) || 0) > 0).map(it => ({
+        product_id: it.product_id || null,
+        product_name: it.product_name || 'Item avulso',
+        quantity: parseFloat(it.quantity) || 1,
+        unit_price: parseFloat(it.unit_price) || 0,
+        total: (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0),
+      }))
+      await bizAPI.addSale(userId, { ...form, total: totalSale }, saleItems)
+      setForm({ client_name: '', date: todayStr(), payment_method: 'Pix', status: 'pending', notes: '' })
+      setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }])
+      setView('list')
+      await reload()
+      addToast('Venda registrada!')
+    } catch { addToast('Erro ao salvar venda', 'error') }
+    setSaving(false)
+  }
+
+  const handlePay = async (id) => {
+    try { await bizAPI.updateSaleStatus(id, 'paid'); await reload(); addToast('Venda paga!') }
+    catch { addToast('Erro', 'error') }
+  }
+  const handleCancel = async (id) => {
+    try { await bizAPI.updateSaleStatus(id, 'cancelled'); await reload(); addToast('Venda cancelada') }
+    catch { addToast('Erro', 'error') }
+  }
+  const handleDelete = async (id) => {
+    try { await bizAPI.deleteSale(id); await reload(); addToast('Venda excluída') }
+    catch { addToast('Erro', 'error') }
+  }
+
+  if (view === 'new') {
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setView('list')}>← Voltar</button>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>Nova Venda</span>
+        </div>
+
+        <div className="card">
+          <div className="card-title">Cliente & Pagamento</div>
+          <label className="label">Cliente</label>
+          {clients.length > 0 ? (
+            <select className="input" style={{ marginBottom: 10 }} value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value === '__manual' ? '' : e.target.value }))}>
+              <option value="">Cliente Avulso</option>
+              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              <option value="__manual">Digitar nome...</option>
+            </select>
+          ) : (
+            <input className="input" style={{ marginBottom: 10 }} placeholder="Nome do cliente (opcional)" value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value }))} />
+          )}
+
+          <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+            <div>
+              <label className="label">Data</label>
+              <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Pagamento</label>
+              <select className="input" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <label className="label">Status</label>
+            <select className="input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+              <option value="pending">Pendente</option>
+              <option value="paid">Pago</option>
+            </select>
+          </div>
+
+          <label className="label">Observações</label>
+          <input className="input" placeholder="Opcional" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+        </div>
+
+        <div className="card">
+          <div className="card-title">🛒 Itens da Venda</div>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '12px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Item {idx + 1}</span>
+                {items.length > 1 && <button onClick={() => removeItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>✕</button>}
+              </div>
+              {products.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <label className="label">Produto/Serviço</label>
+                  <select className="input" value={it.product_id} onChange={e => handleItemChange(idx, 'product_id', e.target.value)}>
+                    <option value="">Avulso / Digitar</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} — {R$(p.price)}</option>)}
+                  </select>
+                </div>
+              )}
+              {(!it.product_id) && (
+                <div style={{ marginBottom: 8 }}>
+                  <label className="label">Descrição</label>
+                  <input className="input" placeholder="Descrição do item" value={it.product_name} onChange={e => handleItemChange(idx, 'product_name', e.target.value)} />
+                </div>
+              )}
+              <div className="g2" style={{ gap: 8 }}>
+                <div>
+                  <label className="label">Qtd</label>
+                  <input className="input" type="number" inputMode="decimal" value={it.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Preço Unit.</label>
+                  <input className="input" type="number" inputMode="decimal" value={it.unit_price} onChange={e => handleItemChange(idx, 'unit_price', e.target.value)} />
+                </div>
+              </div>
+              {it.total > 0 && <div style={{ textAlign: 'right', fontSize: 13, color: '#4ade80', fontWeight: 600, marginTop: 6 }}>Subtotal: {R$(it.total)}</div>}
+            </div>
+          ))}
+          <button className="btn btn-ghost btn-sm" onClick={addItem}>+ Adicionar item</button>
+        </div>
+
+        <div className="card" style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, fontSize: 15 }}>Total da Venda</span>
+            <span style={{ fontWeight: 700, fontSize: 24, color: '#4ade80' }}>{R$(totalSale)}</span>
+          </div>
+          <button className="btn btn-dark btn-full" style={{ marginTop: 14 }} onClick={handleSave} disabled={saving}>
+            {saving ? 'Salvando...' : '✓ Registrar Venda'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const paidMonth = monthSales.filter(s => s.status === 'paid').reduce((s, x) => s + (parseFloat(x.total) || 0), 0)
+  const totalMonth = monthSales.filter(s => s.status !== 'cancelled').reduce((s, x) => s + (parseFloat(x.total) || 0), 0)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <select className="input" style={{ width: 140 }} value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+          {monthOptions().map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+        <button className="btn btn-dark btn-sm" onClick={() => setView('new')}>+ Nova Venda</button>
+      </div>
+
+      <div className="g2" style={{ gap: 8, marginBottom: 12 }}>
+        <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Pago</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#4ade80' }}>{R$(paidMonth)}</div>
+        </div>
+        <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Total</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b' }}>{R$(totalMonth)}</div>
+        </div>
+      </div>
+
+      {monthSales.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40 }}>🛒</div>
+          <div style={{ marginTop: 8, fontWeight: 600 }}>Sem vendas neste mês</div>
+          <button className="btn btn-dark" style={{ marginTop: 12 }} onClick={() => setView('new')}>Registrar primeira venda</button>
+        </div>
+      ) : (
+        monthSales.map(sale => {
+          const st = SALE_STATUS[sale.status] || SALE_STATUS.pending
+          return (
+            <div key={sale.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '12px 14px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{sale.client_name || 'Cliente Avulso'}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sale.date} · {sale.payment_method}</div>
+                  {(sale.biz_sale_items || []).length > 0 && (
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                      {(sale.biz_sale_items || []).slice(0, 3).map(it => `${it.product_name} ×${it.quantity}`).join(', ')}
+                    </div>
+                  )}
+                  {sale.notes && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{sale.notes}</div>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: '#4ade80' }}>{R$(sale.total)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: st.color, marginTop: 2 }}>{st.label}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {sale.status === 'pending' && (
+                  <button onClick={() => handlePay(sale.id)} style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                    ✓ Marcar pago
+                  </button>
+                )}
+                {sale.status === 'pending' && (
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => handleCancel(sale.id)}>Cancelar</button>
+                )}
+                <button onClick={() => handleDelete(sale.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14, marginLeft: 'auto' }}>🗑</button>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+// ─── CAIXA TAB ───────────────────────────────────────────────
+function CaixaTab({ biz }) {
+  const { cashflow, userId, reload, addToast } = biz
+  const [selMonth, setSelMonth] = useState(nowMonth())
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ type: 'entrada', description: '', category: 'Venda', value: '', date: todayStr(), payment_method: 'Pix', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [filterType, setFilterType] = useState('todos')
+
+  const monthCf = useMemo(() => cashflow.filter(cf => cf.date?.startsWith(selMonth)), [cashflow, selMonth])
+  const filtered = useMemo(() => filterType === 'todos' ? monthCf : monthCf.filter(cf => cf.type === filterType), [monthCf, filterType])
+
+  const totalIn = monthCf.filter(cf => cf.type === 'entrada').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
+  const totalOut = monthCf.filter(cf => cf.type === 'saida').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
+  const balance = totalIn - totalOut
+
+  const handleSave = async () => {
+    if (!form.value || parseFloat(form.value) <= 0) { addToast('Digite o valor', 'error'); return }
+    if (!form.description.trim()) { addToast('Digite a descrição', 'error'); return }
+    setSaving(true)
+    try {
+      await bizAPI.addCashflow(userId, { ...form, value: parseFloat(form.value) })
+      setForm({ type: 'entrada', description: '', category: 'Venda', value: '', date: todayStr(), payment_method: 'Pix', notes: '' })
+      setShowForm(false)
+      await reload()
+      addToast('Lançamento registrado!')
+    } catch { addToast('Erro ao salvar', 'error') }
+    setSaving(false)
+  }
+
+  const handleDelete = async (id) => {
+    try { await bizAPI.deleteCashflow(id); await reload(); addToast('Lançamento excluído') }
+    catch { addToast('Erro', 'error') }
+  }
+
+  const cats = form.type === 'entrada' ? CF_CATS_IN : CF_CATS_OUT
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <select className="input" style={{ width: 140 }} value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+          {monthOptions().map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+        <button className="btn btn-dark btn-sm" onClick={() => setShowForm(!showForm)}>+ Lançar</button>
+      </div>
+
+      <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+        <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Entradas</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#4ade80' }}>{R$(totalIn)}</div>
+        </div>
+        <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Saídas</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#f87171' }}>{R$(totalOut)}</div>
+        </div>
+      </div>
+      <div style={{ background: balance >= 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', border: `1px solid ${balance >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 12, padding: '12px 16px', textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Saldo do Mês</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: balance >= 0 ? '#4ade80' : '#f87171' }}>{R$(balance)}</div>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{ marginBottom: 12, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.05)' }}>
+          <div className="card-title">➕ Novo Lançamento</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[['entrada', '📈 Entrada'], ['saida', '📉 Saída']].map(([v, l]) => (
+              <button key={v} className={`btn btn-sm ${form.type === v ? 'btn-dark' : 'btn-ghost'}`}
+                onClick={() => setForm(f => ({ ...f, type: v, category: v === 'entrada' ? 'Venda' : 'Fornecedor' }))}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <label className="label">Descrição *</label>
+          <input className="input" style={{ marginBottom: 10 }} placeholder="Ex: Venda para cliente..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+            <div>
+              <label className="label">Categoria</label>
+              <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {cats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Valor (R$)</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="0,00" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
+            </div>
+          </div>
+          <div className="g2" style={{ gap: 8, marginBottom: 12 }}>
+            <div>
+              <label className="label">Data</label>
+              <input className="input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Forma</label>
+              <select className="input" value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-dark btn-sm" onClick={handleSave} disabled={saving}>{saving ? '...' : '✓ Lançar'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {[['todos', 'Todos'], ['entrada', '📈 Entradas'], ['saida', '📉 Saídas']].map(([v, l]) => (
+          <button key={v} className={`btn btn-sm ${filterType === v ? 'btn-dark' : 'btn-ghost'}`} onClick={() => setFilterType(v)}>{l}</button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40 }}>💰</div>
+          <div style={{ marginTop: 8, fontWeight: 600 }}>Sem lançamentos neste período</div>
+        </div>
+      ) : (
+        filtered.map(cf => (
+          <div key={cf.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: `1px solid ${cf.type === 'entrada' ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)'}`, padding: '10px 14px', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{cf.description}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{cf.date} · {cf.category} · {cf.payment_method}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: cf.type === 'entrada' ? '#4ade80' : '#f87171' }}>
+                {cf.type === 'entrada' ? '+' : '-'}{R$(cf.value)}
+              </span>
+              <button onClick={() => handleDelete(cf.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
+// ─── CLIENTES TAB ────────────────────────────────────────────
+function ClientesTab({ biz }) {
+  const { clients, sales, userId, reload, addToast } = biz
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const clientStats = useMemo(() => {
+    const stats = {}
+    sales.filter(s => s.status === 'paid' && s.client_name).forEach(sale => {
+      if (!stats[sale.client_name]) stats[sale.client_name] = { count: 0, total: 0 }
+      stats[sale.client_name].count++
+      stats[sale.client_name].total += parseFloat(sale.total) || 0
+    })
+    return stats
+  }, [sales])
+
+  const filtered = useMemo(() =>
+    clients.filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase())), [clients, search])
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) { addToast('Digite o nome', 'error'); return }
+    setSaving(true)
+    try {
+      await bizAPI.addClient(userId, form)
+      setForm({ name: '', phone: '', email: '', notes: '' })
+      setShowForm(false)
+      await reload()
+      addToast('Cliente adicionado!')
+    } catch { addToast('Erro ao salvar', 'error') }
+    setSaving(false)
+  }
+
+  const handleDelete = async (id) => {
+    try { await bizAPI.deleteClient(id); await reload(); addToast('Cliente removido') }
+    catch { addToast('Erro', 'error') }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input className="input" style={{ flex: 1 }} placeholder="🔍 Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+        <button className="btn btn-dark btn-sm" onClick={() => setShowForm(!showForm)}>+ Novo</button>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{ marginBottom: 12, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.05)' }}>
+          <div className="card-title">➕ Novo Cliente</div>
+          <label className="label">Nome *</label>
+          <input className="input" style={{ marginBottom: 10 }} placeholder="Nome completo" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+          <div className="g2" style={{ gap: 8, marginBottom: 10 }}>
+            <div>
+              <label className="label">Telefone</label>
+              <input className="input" placeholder="(00) 00000-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">E-mail</label>
+              <input className="input" type="email" placeholder="email@..." value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+          </div>
+          <label className="label">Observações</label>
+          <input className="input" style={{ marginBottom: 12 }} placeholder="Notas sobre o cliente" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-dark btn-sm" onClick={handleAdd} disabled={saving}>{saving ? '...' : '✓ Salvar'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 40 }}>👥</div>
+          <div style={{ marginTop: 8, fontWeight: 600 }}>{search ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}</div>
+          {!search && <button className="btn btn-dark" style={{ marginTop: 12 }} onClick={() => setShowForm(true)}>Adicionar primeiro cliente</button>}
+        </div>
+      ) : (
+        filtered.map(c => {
+          const stats = clientStats[c.name]
+          return (
+            <div key={c.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '12px 14px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: 12, flex: 1 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {c.name[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
+                  {c.phone && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>📱 {c.phone}</div>}
+                  {c.email && <div style={{ fontSize: 12, color: '#94a3b8' }}>✉️ {c.email}</div>}
+                  {c.notes && <div style={{ fontSize: 12, color: '#64748b' }}>{c.notes}</div>}
+                  {stats && (
+                    <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 4 }}>
+                      {stats.count} compra{stats.count > 1 ? 's' : ''} · {R$(stats.total)} total
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, padding: '4px' }}>🗑</button>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
@@ -35,9 +864,8 @@ function FaccoesTab({ lot, lotIdx }) {
 
   return (
     <div>
-      {/* PRODUÇÃO GERAL */}
       <div className="card">
-        <div className="card-title">🪡 Produção Geral</div>
+        <div className="card-title">🧵 Produção Geral</div>
         <div className="scroll-x">
           <table className="tbl">
             <thead><tr><th>REF</th><th>Descrição</th><th>Valor/pç</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
@@ -65,7 +893,6 @@ function FaccoesTab({ lot, lotIdx }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
       </div>
 
-      {/* GASTOS COM AS FACÇÕES */}
       <div className="card">
         <div className="card-title">💸 Gastos com as Facções</div>
         <div className="scroll-x">
@@ -92,7 +919,6 @@ function FaccoesTab({ lot, lotIdx }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
       </div>
 
-      {/* PARTICIPANTES — um card por pessoa */}
       {workers.map((w, wi) => {
         const wi_items = w.worker_items || []
         const workerEarned = items.reduce((s, item) => {
@@ -104,8 +930,7 @@ function FaccoesTab({ lot, lotIdx }) {
           <div key={w.id} className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="card-title" style={{ marginBottom: 0 }}>👤 {w.name}</div>
-              <button onClick={() => deleteWorker(lotIdx, w.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>🗑</button>
+              <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>🗑</button>
             </div>
             <div className="scroll-x">
               <table className="tbl">
@@ -121,10 +946,7 @@ function FaccoesTab({ lot, lotIdx }) {
                         <td style={{ fontSize: 12 }}>{item.description}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <input className="tbl-input" type="number" inputMode="decimal"
-                              value={pctVal || ''} placeholder="0"
-                              style={{ width: 50, textAlign: 'right' }}
-                              onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
+                            <input className="tbl-input" type="number" inputMode="decimal" value={pctVal || ''} placeholder="0" style={{ width: 50, textAlign: 'right' }} onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
                             <span style={{ color: '#94a3b8', fontSize: 11 }}>%</span>
                           </div>
                         </td>
@@ -135,15 +957,14 @@ function FaccoesTab({ lot, lotIdx }) {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DAS PRODUÇÕES</td>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL</td>
                     <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(workerEarned)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
             {w.is_family_income && workerEarned > 0 && (
-              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, color: '#4ade80' }}
-                onClick={() => addFamilyIncomeTx(w.name, workerEarned)}>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, color: '#4ade80' }} onClick={() => addFamilyIncomeTx(w.name, workerEarned)}>
                 📥 Lançar como receita familiar
               </button>
             )}
@@ -151,7 +972,6 @@ function FaccoesTab({ lot, lotIdx }) {
         )
       })}
 
-      {/* Adicionar participante */}
       <div className="card">
         <div className="card-title">👥 Participantes</div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -160,7 +980,6 @@ function FaccoesTab({ lot, lotIdx }) {
         </div>
       </div>
 
-      {/* RELATÓRIO DE GANHOS E GASTOS */}
       {totalProd > 0 && (
         <div className="card">
           <div className="card-title">📊 Relatório de Ganhos e Gastos</div>
@@ -176,26 +995,19 @@ function FaccoesTab({ lot, lotIdx }) {
           )}
           {workers.length > 1 && (
             <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Dividido para ({workers.map(w => w.name).join(' & ')})
-              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Dividido para ({workers.map(w => w.name).join(' & ')})</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#60a5fa' }}>{R$(netResult / workers.length)}</div>
             </div>
           )}
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Valores e dias</div>
             <div className="g2" style={{ gap: 8, alignItems: 'flex-end' }}>
               <div>
                 <label className="label">Dias trabalhados</label>
-                <input className="input" type="number" inputMode="numeric"
-                  value={lot.work_days || ''} placeholder="0"
-                  onChange={e => updateLot(lotIdx, { work_days: parseInt(e.target.value) || 0 })} />
+                <input className="input" type="number" inputMode="numeric" value={lot.work_days || ''} placeholder="0" onChange={e => updateLot(lotIdx, { work_days: parseInt(e.target.value) || 0 })} />
               </div>
               <div className="stat">
                 <div className="stat-label">Preço do dia</div>
-                <div style={{ fontWeight: 700, fontSize: 18, color: '#fbbf24' }}>
-                  {days > 0 ? R$(dailyRate) : '—'}
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: '#fbbf24' }}>{days > 0 ? R$(dailyRate) : '—'}</div>
               </div>
             </div>
           </div>
@@ -210,8 +1022,7 @@ function FaccoesTab({ lot, lotIdx }) {
   )
 }
 
-
-// ─── DRE TAB ────────────────────────────────────────────────
+// ─── DRE TAB ─────────────────────────────────────────────────
 const DRE_STRUCTURE = [
   { key: 'rec_bruta', label: 'RECEITA BRUTA', type: 'input', rows: true },
   { key: 'deducoes', label: '(-) DEDUÇÕES', type: 'input', rows: true },
@@ -230,14 +1041,9 @@ const DRE_STRUCTURE = [
 function DreTab({ lots, userId }) {
   const now = new Date()
   const [period, setPeriod] = useState(`${MONTHS[now.getMonth()]}/${now.getFullYear()}`)
-  const [dre, setDre] = useState({
-    rec_bruta: [{ desc: 'Receita principal', val: 0 }],
-    deducoes: [{ desc: 'Devoluções', val: 0 }],
-    desp_op: [{ desc: 'Despesas gerais', val: 0 }],
-    desp_fin: 0, rec_fin: 0, ir: 0,
-  })
+  const [dre, setDre] = useState({ rec_bruta: [{ desc: 'Receita principal', val: 0 }], deducoes: [{ desc: 'Devoluções', val: 0 }], desp_op: [{ desc: 'Despesas gerais', val: 0 }], desp_fin: 0, rec_fin: 0, ir: 0 })
   const [saving, setSaving] = useState(false)
-  const { addToast, state } = useApp()
+  const { addToast } = useApp()
 
   const cmv = (lots[0]?.lot_items || []).reduce((s, i) => s + (i.value || 0) * (i.quantity || 0), 0)
 
@@ -254,26 +1060,18 @@ function DreTab({ lots, userId }) {
   }
   const calc = calcDRE()
 
-  const setRow = (key, idx, field, val) => {
-    setDre(d => ({
-      ...d,
-      [key]: d[key].map((r, i) => i === idx ? { ...r, [field]: val } : r),
-    }))
-  }
-
+  const setRow = (key, idx, field, val) => setDre(d => ({ ...d, [key]: d[key].map((r, i) => i === idx ? { ...r, [field]: val } : r) }))
   const addRow = (key) => setDre(d => ({ ...d, [key]: [...(d[key] || []), { desc: '', val: 0 }] }))
 
   const handleSave = async () => {
     setSaving(true)
-    try {
-      await dreAPI.upsert(userId, period, { ...dre, ...calc, cmv })
-      addToast('DRE salva!')
-    } catch { addToast('Erro ao salvar', 'error') }
+    try { await dreAPI.upsert(userId, period, { ...dre, ...calc, cmv }); addToast('DRE salva!') }
+    catch { addToast('Erro ao salvar', 'error') }
     setSaving(false)
   }
 
   const barData = [
-    { name: 'Receita Bruta', val: calc.rec_bruta },
+    { name: 'Rec. Bruta', val: calc.rec_bruta },
     { name: 'Deduções', val: -calc.deducoes },
     { name: 'CMV', val: -cmv },
     { name: 'Desp.Op', val: -calc.desp_op },
@@ -287,7 +1085,6 @@ function DreTab({ lots, userId }) {
           <div style={{ fontWeight: 700 }}>Período</div>
           <input className="input" style={{ width: 140 }} placeholder="Mês/Ano" value={period} onChange={e => setPeriod(e.target.value)} />
         </div>
-
         {DRE_STRUCTURE.map(row => {
           if (row.type === 'input' && row.rows) {
             return (
@@ -307,8 +1104,7 @@ function DreTab({ lots, userId }) {
             return (
               <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 13, color: '#94a3b8' }}>{row.label}</span>
-                <input className="input" style={{ width: 120 }} type="number" inputMode="decimal"
-                  value={dre[row.key] || ''} onChange={e => setDre(d => ({ ...d, [row.key]: e.target.value }))} />
+                <input className="input" style={{ width: 120 }} type="number" inputMode="decimal" value={dre[row.key] || ''} onChange={e => setDre(d => ({ ...d, [row.key]: e.target.value }))} />
               </div>
             )
           }
@@ -320,7 +1116,6 @@ function DreTab({ lots, userId }) {
               </div>
             )
           }
-          // calc
           const val = calc[row.key]
           return (
             <div key={row.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 14px', background: row.color, borderRadius: 8, marginBottom: 12 }}>
@@ -349,25 +1144,21 @@ function DreTab({ lots, userId }) {
 
       <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : '💾 Salvar DRE'}</button>
 
-      {/* Integração ao Orçamento Pessoal */}
       <div className="card" style={{ marginTop: 12 }}>
         <div className="card-title">💼 Integrar ao Orçamento Pessoal</div>
         <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 12, lineHeight: 1.6 }}>
-          Adicione o Lucro Líquido mensal do negócio à sua renda pessoal para cálculo de comprometimento.
-          <br /><b style={{ color: 'var(--text)' }}>Lucro Líquido: {R$(calc.lucro_liq)}</b>
+          Adicione o Lucro Líquido ao seu orçamento pessoal.<br />
+          <b style={{ color: 'var(--text)' }}>Lucro Líquido: {R$(calc.lucro_liq)}</b>
         </div>
         <button className="btn btn-green btn-full" onClick={() => {
           const val = calc.lucro_liq > 0 ? calc.lucro_liq : 0
           localStorage.setItem('businessMonthlyIncome', String(val))
-          addToast(val > 0 ? `✓ Renda do negócio integrada: ${R$(val)}/mês` : 'Renda zerada (lucro negativo)', val > 0 ? 'success' : 'error')
+          addToast(val > 0 ? `✓ Renda integrada: ${R$(val)}/mês` : 'Renda zerada (lucro negativo)', val > 0 ? 'success' : 'error')
         }}>
           💼 Integrar {R$(Math.max(0, calc.lucro_liq))}/mês ao Orçamento
         </button>
         {parseFloat(localStorage.getItem('businessMonthlyIncome') || '0') > 0 && (
-          <button className="btn btn-ghost btn-full" style={{ marginTop: 8 }} onClick={() => {
-            localStorage.removeItem('businessMonthlyIncome')
-            addToast('Renda do negócio removida do orçamento', 'info')
-          }}>
+          <button className="btn btn-ghost btn-full" style={{ marginTop: 8 }} onClick={() => { localStorage.removeItem('businessMonthlyIncome'); addToast('Renda removida do orçamento', 'info') }}>
             ✕ Remover integração
           </button>
         )}
@@ -376,17 +1167,16 @@ function DreTab({ lots, userId }) {
   )
 }
 
-// ─── VPL TAB ────────────────────────────────────────────────
+// ─── VPL TAB ─────────────────────────────────────────────────
 function VplTab({ userId }) {
   const { state, upsertVPL, deleteVPL, addToast } = useApp()
   const { vplProjects } = state
   const [form, setForm] = useState({ name: 'Novo Projeto', investment: 50000, rate: 1.5, periods: 12 })
-  const [flows, setFlows] = useState(Array.from({ length: 12 }, (_, i) => ({ receitas: 0, custos: 0 })))
+  const [flows, setFlows] = useState(Array.from({ length: 12 }, () => ({ receitas: 0, custos: 0 })))
   const [sens, setSens] = useState({ tma: 0, receitas: 0, custos: 0 })
   const [saving, setSaving] = useState(false)
 
   const fcsLiq = flows.map(f => (parseFloat(f.receitas) || 0) - (parseFloat(f.custos) || 0))
-
   const adjustedFlows = fcsLiq.map((fc, i) => {
     const r = (parseFloat(flows[i].receitas) || 0) * (1 + sens.receitas / 100)
     const c = (parseFloat(flows[i].custos) || 0) * (1 + sens.custos / 100)
@@ -404,16 +1194,9 @@ function VplTab({ userId }) {
     setForm(f => ({ ...f, periods: num }))
   }
 
-  const replicateFirst = () => {
-    const first = flows[0] || { receitas: 0, custos: 0 }
-    setFlows(flows.map(() => ({ ...first })))
-  }
+  const replicateFirst = () => { const first = flows[0] || { receitas: 0, custos: 0 }; setFlows(flows.map(() => ({ ...first }))) }
 
-  const handleSave = async () => {
-    setSaving(true)
-    await upsertVPL({ ...form, cash_flows: flows })
-    setSaving(false)
-  }
+  const handleSave = async () => { setSaving(true); await upsertVPL({ ...form, cash_flows: flows }); setSaving(false) }
 
   const chartData = flows.map((f, i) => {
     const fc = fcsLiq.slice(0, i + 1).reduce((s, x) => s + x, 0) - form.investment
@@ -424,7 +1207,6 @@ function VplTab({ userId }) {
 
   return (
     <div>
-      {/* Form */}
       <div className="card">
         <div className="card-title">Novo Projeto VPL</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -437,7 +1219,6 @@ function VplTab({ userId }) {
         </div>
       </div>
 
-      {/* Fluxo de caixa */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div className="card-title" style={{ marginBottom: 0 }}>Fluxo de Caixa</div>
@@ -466,7 +1247,6 @@ function VplTab({ userId }) {
         </div>
       </div>
 
-      {/* Resultados */}
       <div className="g2" style={{ marginBottom: 12 }}>
         <div className="stat"><div className="stat-label">VPL</div><div className="stat-value" style={{ fontSize: 16, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>{R$(vpl)}</div></div>
         <div className="stat"><div className="stat-label">TIR</div><div className="stat-value" style={{ fontSize: 16 }}>{pct(tir, 2)}</div></div>
@@ -475,13 +1255,10 @@ function VplTab({ userId }) {
       </div>
 
       <div className="card" style={{ textAlign: 'center', background: vpl >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.1)', borderColor: vpl >= 0 ? '#22c55e' : '#ef4444' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>
-          {vpl >= 0 ? '✅ PROJETO VIÁVEL' : '❌ PROJETO INVIÁVEL'}
-        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>{vpl >= 0 ? '✅ PROJETO VIÁVEL' : '❌ PROJETO INVIÁVEL'}</div>
         <div style={{ fontSize: 12, marginTop: 4, color: '#94a3b8' }}>VPL {vpl >= 0 ? 'positivo' : 'negativo'} · TIR {pct(tir, 2)} · IL {il.toFixed(2)}</div>
       </div>
 
-      {/* Gráfico */}
       {chartData.length > 0 && (
         <div className="card">
           <div className="card-title">Evolução do FC</div>
@@ -498,7 +1275,6 @@ function VplTab({ userId }) {
         </div>
       )}
 
-      {/* Sensibilidade */}
       <div className="card">
         <div className="card-title">Análise de Sensibilidade</div>
         {[['tma', 'TMA (%)', -5, 5], ['receitas', 'Receitas (%)', -20, 20], ['custos', 'Custos (%)', -20, 20]].map(([key, label, min, max]) => (
@@ -506,19 +1282,14 @@ function VplTab({ userId }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
               <span>{label}</span><span style={{ fontWeight: 600 }}>{sens[key] > 0 ? '+' : ''}{sens[key]}%</span>
             </div>
-            <input type="range" min={min} max={max} step={0.5} value={sens[key]}
-              onChange={e => setSens(s => ({ ...s, [key]: parseFloat(e.target.value) }))}
-              style={{ width: '100%' }} />
+            <input type="range" min={min} max={max} step={0.5} value={sens[key]} onChange={e => setSens(s => ({ ...s, [key]: parseFloat(e.target.value) }))} style={{ width: '100%' }} />
           </div>
         ))}
-        <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>
-          VPL ajustado: {R$(vpl)}
-        </div>
+        <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: vpl >= 0 ? '#15803d' : '#dc2626' }}>VPL ajustado: {R$(vpl)}</div>
       </div>
 
       <button className="btn btn-dark btn-full" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : '💾 Salvar Projeto'}</button>
 
-      {/* Lista projetos */}
       {vplProjects.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
           <div className="card-title">Projetos Salvos</div>
@@ -541,69 +1312,6 @@ function VplTab({ userId }) {
   )
 }
 
-// ─── FATURAMENTO TAB ─────────────────────────────────────────
-function FaturamentoTab() {
-  const { state } = useApp()
-  const faccaoTxs = (state.transactions || []).filter(t => t.type === 'income' && t.description && t.description.startsWith('Facção - '))
-
-  const byLot = {}
-  faccaoTxs.forEach(t => {
-    const lotName = t.description.replace(/^Facção - /, '')
-    if (!byLot[lotName]) byLot[lotName] = { name: lotName, count: 0, total: 0, txs: [] }
-    byLot[lotName].count++
-    byLot[lotName].total += parseFloat(t.value) || 0
-    byLot[lotName].txs.push(t)
-  })
-
-  const lotsData = Object.values(byLot).sort((a, b) => b.total - a.total)
-  const grandTotal = lotsData.reduce((s, l) => s + l.total, 0)
-
-  if (lotsData.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-        <div style={{ fontSize: 40 }}>📊</div>
-        <div style={{ marginTop: 8, fontWeight: 600 }}>Nenhuma receita de facção lançada ainda</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>Use o botão "Lançar como receita do mês" em Facções</div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <div className="card">
-        <div className="card-title">📊 Faturamento Total por Lote</div>
-        <div style={{ textAlign: 'right', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>TOTAL GERAL FATURADO</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#4ade80' }}>{R$(grandTotal)}</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{faccaoTxs.length} lançamento{faccaoTxs.length > 1 ? 's' : ''} registrado{faccaoTxs.length > 1 ? 's' : ''}</div>
-        </div>
-        {lotsData.map(l => (
-          <div key={l.name} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>🪡 {l.name}</div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{l.count} lançamento{l.count > 1 ? 's' : ''}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: '#4ade80', fontSize: 17 }}>{R$(l.total)}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>{grandTotal > 0 ? Math.round(l.total / grandTotal * 100) : 0}% do total</div>
-              </div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
-              {[...l.txs].sort((a, b) => b.date.localeCompare(a.date)).map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ color: '#94a3b8' }}>{t.date}</span>
-                  <span style={{ color: '#4ade80', fontWeight: 600 }}>{R$(t.value)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ─── MAIN ────────────────────────────────────────────────────
 export default function NegocioScreen() {
   const { state, dispatch, addLot, addToast } = useApp()
@@ -611,57 +1319,112 @@ export default function NegocioScreen() {
   const [newLotName, setNewLotName] = useState('')
   const [showNewLot, setShowNewLot] = useState(false)
 
+  const [bizProfile, setBizProfile] = useState(null)
+  const [products, setProducts] = useState([])
+  const [sales, setSales] = useState([])
+  const [clients, setClients] = useState([])
+  const [cashflow, setCashflow] = useState([])
+
+  const loadBizData = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const [profile, prods, sls, cls, cf] = await Promise.all([
+        bizAPI.getProfile(user.id).catch(() => null),
+        bizAPI.getProducts(user.id).catch(() => []),
+        bizAPI.getSales(user.id).catch(() => []),
+        bizAPI.getClients(user.id).catch(() => []),
+        bizAPI.getCashflow(user.id).catch(() => []),
+      ])
+      setBizProfile(profile)
+      setProducts(prods || [])
+      setSales(sls || [])
+      setClients(cls || [])
+      setCashflow(cf || [])
+    } catch {
+      // Tables may not exist yet — silent fail
+    }
+  }, [user?.id])
+
+  useEffect(() => { loadBizData() }, [loadBizData])
+
+  const biz = { profile: bizProfile, products, sales, clients, cashflow, userId: user?.id, reload: loadBizData, addToast }
+
   const lot = lots[activeLotIdx]
+
+  const VALID_TABS = ['visao', 'negocio', 'catalogo', 'vendas', 'caixa', 'clientes', 'faccoes', 'dre', 'vpl']
+  const currentTab = VALID_TABS.includes(activeNegTab) ? activeNegTab : 'visao'
+
+  const NEG_TABS = [
+    ['visao', '📊 Painel'],
+    ['negocio', '⚙️ Negócio'],
+    ['catalogo', '📦 Catálogo'],
+    ['vendas', '🛒 Vendas'],
+    ['caixa', '💰 Caixa'],
+    ['clientes', '👥 Clientes'],
+    ['faccoes', '🧵 Facções'],
+    ['dre', 'DRE'],
+    ['vpl', 'VPL/TIR'],
+  ]
 
   return (
     <div>
       <div className="hdr hdr-slate">
         <h1>Módulo Negócio</h1>
-        <p>Facções · DRE · VPL</p>
+        <p>{bizProfile?.name || 'Configure seu negócio'} · {bizProfile?.type || 'Gestão Empresarial'}</p>
       </div>
 
       <div style={{ padding: '0 16px' }}>
-        <div className="tabs" style={{ marginTop: 12 }}>
-          {[['faccoes', 'Facções'], ['dre', 'DRE'], ['vpl', 'VPL/TIR'], ['faturamento', '📊 Faturamento']].map(([id, label]) => (
-            <button key={id} className={`tab${activeNegTab === id ? ' active' : ''}`}
-              onClick={() => dispatch({ type: 'SET_NEG_TAB', tab: id })}>{label}</button>
-          ))}
+        <div style={{ overflowX: 'auto', marginTop: 12, paddingBottom: 2 }}>
+          <div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
+            {NEG_TABS.map(([id, label]) => (
+              <button key={id} className={`tab${currentTab === id ? ' active' : ''}`}
+                onClick={() => dispatch({ type: 'SET_NEG_TAB', tab: id })} style={{ whiteSpace: 'nowrap' }}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {activeNegTab === 'faccoes' && (
-          <>
-            {/* Seletor de lotes */}
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
-              {lots.map((l, i) => (
-                <button key={l.id} onClick={() => dispatch({ type: 'SET_LOT_IDX', idx: i })}
-                  className={`btn btn-sm ${i === activeLotIdx ? 'btn-dark' : 'btn-ghost'}`} style={{ whiteSpace: 'nowrap' }}>
-                  {l.name}
-                </button>
-              ))}
-              {!showNewLot ? (
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(true)} style={{ whiteSpace: 'nowrap' }}>+ Novo Lote</button>
-              ) : (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input className="input" style={{ width: 120 }} placeholder="Nome do lote" value={newLotName} onChange={e => setNewLotName(e.target.value)} />
-                  <button className="btn btn-dark btn-sm" onClick={() => { if (newLotName.trim()) { addLot(newLotName.trim()); setNewLotName(''); setShowNewLot(false) } }}>✓</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(false)}>✗</button>
+        <div style={{ marginTop: 12 }}>
+          {currentTab === 'visao' && <VisaoGeralTab biz={biz} />}
+          {currentTab === 'negocio' && <NegocioSetupTab biz={biz} />}
+          {currentTab === 'catalogo' && <CatalogoTab biz={biz} />}
+          {currentTab === 'vendas' && <VendasTab biz={biz} />}
+          {currentTab === 'caixa' && <CaixaTab biz={biz} />}
+          {currentTab === 'clientes' && <ClientesTab biz={biz} />}
+
+          {currentTab === 'faccoes' && (
+            <>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
+                {lots.map((l, i) => (
+                  <button key={l.id} onClick={() => dispatch({ type: 'SET_LOT_IDX', idx: i })}
+                    className={`btn btn-sm ${i === activeLotIdx ? 'btn-dark' : 'btn-ghost'}`} style={{ whiteSpace: 'nowrap' }}>
+                    {l.name}
+                  </button>
+                ))}
+                {!showNewLot ? (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(true)} style={{ whiteSpace: 'nowrap' }}>+ Novo Lote</button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input className="input" style={{ width: 120 }} placeholder="Nome do lote" value={newLotName} onChange={e => setNewLotName(e.target.value)} />
+                    <button className="btn btn-dark btn-sm" onClick={() => { if (newLotName.trim()) { addLot(newLotName.trim()); setNewLotName(''); setShowNewLot(false) } }}>✓</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(false)}>✗</button>
+                  </div>
+                )}
+              </div>
+              {lot ? <FaccoesTab lot={lot} lotIdx={activeLotIdx} /> : (
+                <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                  <div style={{ fontSize: 40 }}>🧵</div>
+                  <div style={{ marginTop: 8 }}>Nenhum lote criado</div>
+                  <button className="btn btn-dark" style={{ marginTop: 12 }} onClick={() => setShowNewLot(true)}>Criar primeiro lote</button>
                 </div>
               )}
-            </div>
+            </>
+          )}
 
-            {lot ? <FaccoesTab lot={lot} lotIdx={activeLotIdx} /> : (
-              <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-                <div style={{ fontSize: 40 }}>🪡</div>
-                <div style={{ marginTop: 8 }}>Nenhum lote criado</div>
-                <button className="btn btn-dark" style={{ marginTop: 12 }} onClick={() => setShowNewLot(true)}>Criar primeiro lote</button>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeNegTab === 'dre' && <DreTab lots={lots} userId={user?.id} />}
-        {activeNegTab === 'vpl' && <VplTab userId={user?.id} />}
-        {activeNegTab === 'faturamento' && <FaturamentoTab />}
+          {currentTab === 'dre' && <DreTab lots={lots} userId={user?.id} />}
+          {currentTab === 'vpl' && <VplTab userId={user?.id} />}
+        </div>
       </div>
     </div>
   )
