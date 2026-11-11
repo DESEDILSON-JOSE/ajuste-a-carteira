@@ -32,7 +32,7 @@ function GastosFixosTabP() {
         }
       }
     })
-    return Object.values(groups)
+    return Object.values(groups).sort((a,b) => a.description.localeCompare(b.description, "pt-BR"))
   }, [state.transactions])
 
   const total = fixos.reduce((s, f) => s + f.value, 0)
@@ -198,7 +198,7 @@ function ReceitaPrevistaTab() {
         }
       }
     })
-    return Object.values(groups)
+    return Object.values(groups).sort((a,b) => a.description.localeCompare(b.description, "pt-BR"))
   }, [state.transactions])
 
   const totalMensal = receitas.reduce((s, r) => s + r.value, 0)

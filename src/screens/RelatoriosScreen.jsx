@@ -371,7 +371,7 @@ function GastosFixosTab() {
         }
       }
     })
-    return Object.values(groups)
+    return Object.values(groups).sort((a,b) => a.description.localeCompare(b.description, "pt-BR"))
   }, [state.transactions])
 
   const total = fixos.reduce((s, f) => s + f.value, 0)
@@ -859,7 +859,7 @@ function ContasTab({ transactions }) {
                   </div>
 
                   {/* Transaction list */}
-                  {data.txs.sort((a, b) => b.date.localeCompare(a.date)).map(t => (
+                  {[...data.txs].sort((a, b) => b.date.localeCompare(a.date) || (a.description||).localeCompare(b.description||, "pt-BR")).map(t => (
                     <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13 }}>
                       <span style={{ fontSize: 18 }}>{CAT_ICON[t.category] || '📌'}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>

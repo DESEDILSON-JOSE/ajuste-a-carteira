@@ -38,6 +38,8 @@ export default function TransacoesScreen() {
       if (!groups[t.date]) groups[t.date] = []
       groups[t.date].push(t)
     })
+    // Ordena transações dentro de cada dia por descrição A→Z
+    Object.values(groups).forEach(arr => arr.sort((a,b) => (a.description||).localeCompare(b.description||, "pt-BR")))
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
 
