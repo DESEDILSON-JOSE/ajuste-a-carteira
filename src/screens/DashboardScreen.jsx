@@ -97,7 +97,7 @@ export default function DashboardScreen() {
 
   const { budgets } = state
 
-  const { monthTxs, totalIncome, totalExpense, balance, prevBalance, byCategory, overdue, dueToday, creditCardUnpaid, creditCardTotal, creditCardAll, last8 } = useMemo(() => {
+  const { monthTxs, totalIncome, totalExpense, balance, prevBalance, cumulativeBalance, byCategory, overdue, dueToday, creditCardUnpaid, creditCardTotal, creditCardAll, last8 } = useMemo(() => {
     const monthTxs = transactions.filter(t => {
       const d = new Date(t.date + 'T12:00:00')
       return d.getMonth() + 1 === selM && d.getFullYear() === selY
@@ -123,9 +123,18 @@ export default function DashboardScreen() {
     const creditCardAll = monthTxs.filter(t => t.type === 'expense' && t.account === 'Cartão de Crédito')
     const creditCardUnpaid = creditCardAll.filter(t => !t.paid)
     const creditCardTotal = creditCardAll.reduce((s, t) => s + t.value, 0)
+    // Saldo acumulado: soma de todos os meses até o mês selecionado (inclusive)
+    const cumulativeBalance = transactions.reduce((acc, t) => {
+      const d = new Date(t.date + 'T12:00:00')
+      const tY = d.getFullYear()
+      const tM = d.getMonth() + 1
+      if (tY > selY || (tY === selY && tM > selM)) return acc
+      return t.type === 'income' ? acc + t.value : t.type === 'expense' ? acc - t.value : acc
+    }, 0)
+
     return {
       monthTxs, totalIncome: inc, totalExpense: exp, balance: inc - exp,
-      prevBalance: pInc - pExp,
+      prevBalance: pInc - pExp, cumulativeBalance,
       byCategory, overdue, dueToday,
       creditCardUnpaid, creditCardTotal, creditCardAll,
       last8: [...monthTxs].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8),
@@ -183,8 +192,11 @@ export default function DashboardScreen() {
             <span>{MONTHS[selM - 1]} {selY}</span>
             <button onClick={() => changeMonth(1)}>›</button>
           </div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: balance >= 0 ? '#4ade80' : '#f87171' }}>{R$(balance)}</div>
-          <div style={{ fontSize: 12, opacity: .6, marginBottom: 8 }}>Saldo do mês</div>
+          <div style={{ fontSize: 36, fontWeight: 700, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171' }}>{R$(cumulativeBalance)}</div>
+          <div style={{ fontSize: 12, opacity: .6, marginBottom: 4 }}>Saldo acumulado</div>
+          <div style={{ fontSize: 13, color: balance >= 0 ? '#4ade80' : '#f87171', marginBottom: 8 }}>
+            {balance >= 0 ? '+' : ''}{R$(balance)} <span style={{ color: 'var(--cinza)', fontWeight: 400 }}>este mês</span>
+          </div>
           <div className="g2" style={{ gap: 8 }}>
             <div style={{ background: 'rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px' }}>
               <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 2 }}>↑ Receitas</div>
