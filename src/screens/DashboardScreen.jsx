@@ -198,8 +198,10 @@ export default function DashboardScreen() {
             <span>{MONTHS[selM - 1]} {selY}</span>
             <button onClick={() => changeMonth(1)}>›</button>
           </div>
-          <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-1px', color: balance >= 0 ? '#4ade80' : '#f87171', lineHeight: 1.1, marginBottom: 4 }}>{balance >= 0 ? '+' : ''}{R$(balance)}</div>
-          <div style={{ fontSize: 11, opacity: .55, marginBottom: 10, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Saldo do mês</div>
+          {/* SALDO MÊS VIGENTE - GRANDE EM CIMA */}
+          <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-1px', color: balance >= 0 ? '#4ade80' : '#f87171', lineHeight: 1.1, marginBottom: 2 }}>{balance >= 0 ? '+' : ''}{R$(balance)}</div>
+          <div style={{ fontSize: 11, opacity: .55, marginBottom: 12, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Saldo do mês vigente</div>
+          {/* SALDO ACUMULADO - PEQUENO EMBAIXO */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 12px', marginBottom: 14 }}>
             <span style={{ fontSize: 12, color: cumulativeBalance >= 0 ? '#4ade80' : '#f87171', fontWeight: 700 }}>{R$(cumulativeBalance)}</span>
             <span style={{ color: 'var(--cinza)', fontWeight: 400, fontSize: 11 }}>acumulado</span>
