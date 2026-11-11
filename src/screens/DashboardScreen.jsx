@@ -123,18 +123,16 @@ export default function DashboardScreen() {
     const creditCardAll = monthTxs.filter(t => t.type === 'expense' && t.account === 'Cartão de Crédito')
     const creditCardUnpaid = creditCardAll.filter(t => !t.paid)
     const creditCardTotal = creditCardAll.reduce((s, t) => s + t.value, 0)
-    // Saldo acumulado: só a partir do primeiro lançamento do usuário no app
-    const firstTxDate = transactions.length > 0
-      ? transactions.reduce((min, t) => t.date < min ? t.date : min, transactions[0].date)
-      : null
-    const firstTxYear = firstTxDate ? parseInt(firstTxDate.slice(0,4)) : selY
-    const firstTxMonth = firstTxDate ? parseInt(firstTxDate.slice(5,7)) : selM
+    // Saldo acumulado: só a partir do mês em que o usuário criou o perfil no app
+    const appStartRaw = profile?.created_at || null
+    const appStartYear = appStartRaw ? new Date(appStartRaw).getFullYear() : selY
+    const appStartMonth = appStartRaw ? new Date(appStartRaw).getMonth() + 1 : selM
     const cumulativeBalance = transactions.reduce((acc, t) => {
       const d = new Date(t.date + 'T12:00:00')
       const tY = d.getFullYear()
       const tM = d.getMonth() + 1
-      // Ignora meses anteriores ao primeiro lançamento
-      if (tY < firstTxYear || (tY === firstTxYear && tM < firstTxMonth)) return acc
+      // Ignora tudo antes do mês que o usuário começou a usar o app
+      if (tY < appStartYear || (tY === appStartYear && tM < appStartMonth)) return acc
       // Ignora meses futuros ao selecionado
       if (tY > selY || (tY === selY && tM > selM)) return acc
       return t.type === 'income' ? acc + t.value : t.type === 'expense' ? acc - t.value : acc
