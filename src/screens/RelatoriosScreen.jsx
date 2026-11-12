@@ -955,6 +955,7 @@ function MinhaContaTab() {
   const [name, setName] = useState(profile?.name || '')
   const [income, setIncome] = useState(profile?.income || 3000)
   const [pwd, setPwd] = useState({ new: '', confirm: '' })
+  const [startMonth, setStartMonth] = useState(profile?.start_month || '')
   const [saving, setSaving] = useState(false)
   const [members, setMembers] = useState(profile?.members || [])
   const [newMember, setNewMember] = useState('')
@@ -962,7 +963,7 @@ function MinhaContaTab() {
   const savePerfil = async () => {
     setSaving(true)
     try {
-      const updated = { ...profile, name, income: parseFloat(income) || 0, members }
+      const updated = { ...profile, name, income: parseFloat(income) || 0, members, start_month: startMonth || null }
       await profileAPI.update(user.id, updated)
       dispatch({ type: 'SET_PROFILE', profile: updated })
       addToast('Perfil salvo!')
@@ -994,6 +995,11 @@ function MinhaContaTab() {
           <div><label className="label">Nome</label><input className="input" value={name} onChange={e => setName(e.target.value)} /></div>
           <div><label className="label">Email (readonly)</label><input className="input" value={user?.email || ''} readOnly style={{ opacity: .7 }} /></div>
           <div><label className="label">Renda mensal (R$)</label><input className="input" type="number" inputMode="decimal" value={income} onChange={e => setIncome(e.target.value)} /></div>
+          <div>
+            <label className="label">📅 Mês de início no app</label>
+            <input className="input" type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)} />
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>O saldo acumulado só conta a partir deste mês.</div>
+          </div>
           <button className="btn btn-dark btn-full" onClick={savePerfil} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
         </div>
       </div>
