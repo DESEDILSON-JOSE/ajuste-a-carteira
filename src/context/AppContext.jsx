@@ -367,6 +367,7 @@ export function AppProvider({ children }) {
       dispatch({ type: 'ADD_LOT', lot: { ...lot, lot_items: [], lot_expenses: [], workers: [] } })
       dispatch({ type: 'SET_LOT_IDX', idx: state.lots.length })
       addToast('Lote criado!')
+      return lot
     } catch (err) { addToast(err.message, 'error') }
   }
 

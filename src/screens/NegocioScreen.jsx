@@ -834,6 +834,134 @@ function ClientesTab({ biz }) {
   )
 }
 
+// ─── LOT META (localStorage) ───────────────────────────────
+const LOT_STATUS_OPTIONS = ['Em Produção', 'Aguardando', 'Pronto para Entregar', 'Entregue']
+
+function useLotMeta(lotId) {
+  const key = `lot_meta_${lotId}`
+  const read = () => {
+    try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} }
+  }
+  const [meta, setMetaState] = React.useState(read)
+  const save = (updates) => {
+    const next = { ...meta, ...updates }
+    try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
+    setMetaState(next)
+  }
+  return [meta, save]
+}
+
+function LotInfoCard({ lot, lotIdx }) {
+  const { updateLot } = useApp()
+  const [meta, saveMeta] = useLotMeta(lot.id)
+  const [editing, setEditing] = React.useState(false)
+  const [form, setForm] = React.useState({})
+
+  const startEdit = () => {
+    setForm({
+      name: lot.name || '',
+      client: meta.client || '',
+      status: meta.status || LOT_STATUS_OPTIONS[0],
+      entry_date: meta.entry_date || '',
+      delivery_date: meta.delivery_date || '',
+      notes: meta.notes || '',
+    })
+    setEditing(true)
+  }
+
+  const saveEdit = () => {
+    if (form.name.trim() && form.name !== lot.name) updateLot(lotIdx, { name: form.name.trim() })
+    saveMeta({ client: form.client, status: form.status, entry_date: form.entry_date, delivery_date: form.delivery_date, notes: form.notes })
+    setEditing(false)
+  }
+
+  const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const STATUS_COLOR = {
+    'Em Produção': '#38bdf8',
+    'Aguardando': '#fb923c',
+    'Pronto para Entregar': '#a78bfa',
+    'Entregue': '#4ade80',
+  }
+  const statusColor = STATUS_COLOR[meta.status] || '#94a3b8'
+
+  if (editing) return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="card-title" style={{ marginBottom: 12 }}>✏️ Editar Informações do Lote</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Nome do Lote *</label>
+          <input className="input" value={form.name} onChange={f('name')} placeholder="Nome do lote" />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Cliente / Empresa</label>
+          <input className="input" value={form.client} onChange={f('client')} placeholder="Nome do cliente ou empresa" />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Status</label>
+          <select className="input" value={form.status} onChange={f('status')}>
+            {LOT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="g2">
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Data de Entrada</label>
+            <input className="input" type="date" value={form.entry_date} onChange={f('entry_date')} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Data de Entrega</label>
+            <input className="input" type="date" value={form.delivery_date} onChange={f('delivery_date')} />
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Observações</label>
+          <textarea className="input" value={form.notes} onChange={f('notes')} placeholder="Observações sobre o lote..." rows={2} style={{ resize: 'none' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-dark" style={{ flex: 1 }} onClick={saveEdit}>✓ Salvar</button>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, fontSize: 15 }}>{lot.name}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, background: `${statusColor}22`, color: statusColor, padding: '2px 8px', borderRadius: 20 }}>
+              {meta.status || 'Em Produção'}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
+            {meta.client && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>👤 Cliente</div><div style={{ fontWeight: 600 }}>{meta.client}</div></div>
+            )}
+            {meta.entry_date && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>📅 Entrada</div><div style={{ fontWeight: 600 }}>{new Date(meta.entry_date + 'T12:00:00').toLocaleDateString('pt-BR')}</div></div>
+            )}
+            {meta.delivery_date && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>🚚 Entrega</div><div style={{ fontWeight: 600 }}>{new Date(meta.delivery_date + 'T12:00:00').toLocaleDateString('pt-BR')}</div></div>
+            )}
+          </div>
+          {meta.notes && (
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--cinza)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+              📝 {meta.notes}
+            </div>
+          )}
+          {!meta.client && !meta.entry_date && !meta.delivery_date && (
+            <div style={{ fontSize: 12, color: 'var(--cinza)', marginTop: 4 }}>Toque em ✏️ para adicionar informações do lote</div>
+          )}
+        </div>
+        <button onClick={startEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '0 0 0 8px', flexShrink: 0 }}>✏️</button>
+      </div>
+    </div>
+  )
+}
+
+
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
   const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, updateWorkerItem, addTx, addToast } = useApp()
@@ -864,6 +992,7 @@ function FaccoesTab({ lot, lotIdx }) {
 
   return (
     <div>
+      <LotInfoCard lot={lot} lotIdx={lotIdx} />
       <div className="card">
         <div className="card-title">🧵 Produção Geral</div>
         <div className="scroll-x">
@@ -1317,6 +1446,11 @@ export default function NegocioScreen() {
   const { state, dispatch, addLot, addToast } = useApp()
   const { lots, activeLotIdx, activeNegTab, user } = state
   const [newLotName, setNewLotName] = useState('')
+  const [newLotClient, setNewLotClient] = useState('')
+  const [newLotStatus, setNewLotStatus] = useState('Em Produção')
+  const [newLotEntryDate, setNewLotEntryDate] = useState('')
+  const [newLotDeliveryDate, setNewLotDeliveryDate] = useState('')
+  const [newLotNotes, setNewLotNotes] = useState('')
   const [showNewLot, setShowNewLot] = useState(false)
 
   const [bizProfile, setBizProfile] = useState(null)
@@ -1402,23 +1536,64 @@ export default function NegocioScreen() {
                     {l.name}
                   </button>
                 ))}
-                {!showNewLot ? (
+                {!showNewLot && (
                   <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(true)} style={{ whiteSpace: 'nowrap' }}>+ Novo Lote</button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input className="input" style={{ width: 120 }} placeholder="Nome do lote" value={newLotName} onChange={e => setNewLotName(e.target.value)} />
-                    <button className="btn btn-dark btn-sm" onClick={() => { if (newLotName.trim()) { addLot(newLotName.trim()); setNewLotName(''); setShowNewLot(false) } }}>✓</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setShowNewLot(false)}>✗</button>
-                  </div>
                 )}
               </div>
-              {lot ? <FaccoesTab lot={lot} lotIdx={activeLotIdx} /> : (
+              {showNewLot && (
+                <div className="card" style={{ marginBottom: 12 }}>
+                  <div className="card-title" style={{ marginBottom: 12 }}>📦 Novo Lote</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Nome do Lote *</label>
+                      <input className="input" placeholder="Ex: V4422, Lote Janeiro..." value={newLotName} onChange={e => setNewLotName(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Cliente / Empresa</label>
+                      <input className="input" placeholder="Nome do cliente ou empresa" value={newLotClient} onChange={e => setNewLotClient(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Status</label>
+                      <select className="input" value={newLotStatus} onChange={e => setNewLotStatus(e.target.value)}>
+                        {LOT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="g2">
+                      <div>
+                        <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Data de Entrada</label>
+                        <input className="input" type="date" value={newLotEntryDate} onChange={e => setNewLotEntryDate(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Data de Entrega</label>
+                        <input className="input" type="date" value={newLotDeliveryDate} onChange={e => setNewLotDeliveryDate(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Observações</label>
+                      <textarea className="input" value={newLotNotes} onChange={e => setNewLotNotes(e.target.value)} placeholder="Observações sobre este lote..." rows={2} style={{ resize: 'none' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-dark" style={{ flex: 1 }} onClick={async () => {
+                        if (!newLotName.trim()) return
+                        const created = await addLot(newLotName.trim())
+                        if (created?.id) {
+                          const key = `lot_meta_${created.id}`
+                          try { localStorage.setItem(key, JSON.stringify({ client: newLotClient, status: newLotStatus, entry_date: newLotEntryDate, delivery_date: newLotDeliveryDate, notes: newLotNotes })) } catch {}
+                        }
+                        setNewLotName(''); setNewLotClient(''); setNewLotStatus('Em Produção'); setNewLotEntryDate(''); setNewLotDeliveryDate(''); setNewLotNotes(''); setShowNewLot(false)
+                      }}>✓ Criar Lote</button>
+                      <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setShowNewLot(false); setNewLotName('') }}>Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {lot && !showNewLot ? <FaccoesTab lot={lot} lotIdx={activeLotIdx} /> : (!showNewLot && (
                 <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
                   <div style={{ fontSize: 40 }}>🧵</div>
                   <div style={{ marginTop: 8 }}>Nenhum lote criado</div>
                   <button className="btn btn-dark" style={{ marginTop: 12 }} onClick={() => setShowNewLot(true)}>Criar primeiro lote</button>
                 </div>
-              )}
+              ))}
             </>
           )}
 
