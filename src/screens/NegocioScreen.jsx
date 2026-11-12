@@ -1381,6 +1381,42 @@ function FaccoesTab({ lot, lotIdx }) {
                   {isIncome ? '💰 Receita ativa' : '➕ Receita mensal'}
                 </button>
               </div>
+              {/* Lista de todos os lotes deste participante */}
+              {(() => {
+                const workerLots = appState.lots.map(l => {
+                  const matched = (l.workers || []).find(ww => (ww.name || '').toLowerCase().trim() === (w.name || '').toLowerCase().trim())
+                  if (!matched) return null
+                  let lMeta = {}
+                  try { lMeta = JSON.parse(localStorage.getItem(`lot_meta_${l.id}`) || '{}') } catch {}
+                  const wPct = parseFloat((lMeta.worker_pcts || {})[matched.id] || 0)
+                  const lTotal = (parseInt(lMeta.qtd_pecas) || 0) * (parseFloat(lMeta.valor_unitario) || 0)
+                  const wValue = lTotal * wPct / 100
+                  const isCur = l.id === lot.id
+                  return { l, wPct, wValue, isCur, lTotal }
+                }).filter(Boolean)
+                if (workerLots.length === 0) return null
+                return (
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: 1, marginBottom: 5 }}>📦 LOTES DO PARTICIPANTE</div>
+                    {workerLots.map(({ l, wPct, wValue, isCur }) => (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, padding: '4px 8px', borderRadius: 7, background: isCur ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)', border: isCur ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent' }}>
+                        <span style={{ fontSize: 11, color: isCur ? '#818cf8' : '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {isCur ? '▶ ' : ''}{l.name || l.description || `Lote #${l.id}`}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b', flexShrink: 0 }}>{wPct}%</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: wValue > 0 ? '#4ade80' : '#64748b', flexShrink: 0 }}>{R$(wValue)}</span>
+                      </div>
+                    ))}
+                    {workerLots.length > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>
+                          Total: {R$(workerLots.reduce((s, x) => s + x.wValue, 0))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )
         })}
