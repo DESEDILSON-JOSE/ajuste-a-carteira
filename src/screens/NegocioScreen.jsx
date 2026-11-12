@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine, Cell } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { R$, pct, todayStr, MONTHS } from '../utils/formatters'
@@ -1114,6 +1114,36 @@ function FaccoesTab({ lot, lotIdx }) {
     const pct = parseFloat((meta.worker_pcts || {})[workerId]) || 0
     return Math.round(lotTotal * pct / 100 * 100) / 100
   }
+
+  // Sincroniza participantes já marcados como receita mas sem tx_id (retrocompatibilidade)
+  const syncedRef = useRef(false)
+  useEffect(() => {
+    if (syncedRef.current || !workers.length) return
+    const currentIncome = meta.worker_income || {}
+    const currentTxIds = meta.worker_tx_ids || {}
+    const needsSync = workers.filter(w => currentIncome[w.id] === true && !currentTxIds[w.id])
+    if (!needsSync.length) { syncedRef.current = true; return }
+    syncedRef.current = true
+    ;(async () => {
+      const updatedTxIds = { ...currentTxIds }
+      for (const w of needsSync) {
+        const val = calcWorkerValue(w.id)
+        const saved = await addTx({
+          type: 'income',
+          description: `Facção – ${w.name}${lot?.description ? ' (' + lot.description + ')' : ''}`,
+          value: val > 0 ? val : 0,
+          date: todayStr(),
+          category: 'Negócio',
+          account: 'Pix',
+          paid: true,
+          notes: 'Receita de facção',
+        })
+        updatedTxIds[w.id] = saved?.id || null
+      }
+      saveMeta({ worker_tx_ids: updatedTxIds })
+      addToast(`Receita sincronizada para ${needsSync.length} participante(s)`)
+    })()
+  }, [workers.length]) // eslint-disable-line
 
   const toggleWorkerIncome = async (w, newState) => {
     if (newState) {
