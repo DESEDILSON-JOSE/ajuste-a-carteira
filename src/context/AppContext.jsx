@@ -223,6 +223,7 @@ export function AppProvider({ children }) {
         const saved = await txAPI.add(newTx)
         dispatch({ type: 'ADD_TX', tx: saved })
         addToast('Transação salva!')
+        return saved
       }
     } catch (err) { addToast(err.message, 'error') }
   }

@@ -1055,7 +1055,7 @@ function LotInfoCard({ lot, lotIdx }) {
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, updateExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
+  const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, updateExpense, deleteExpense, addWorker, deleteWorker, addTx, deleteTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(true)
   const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
@@ -1107,19 +1107,71 @@ function FaccoesTab({ lot, lotIdx }) {
 
   // Worker income toggle: só salva no meta, sem criar transação real
   const workerIncome = meta.worker_income || {}
-  const toggleWorkerIncome = (w, newState) => {
-    saveMeta({ worker_income: { ...workerIncome, [w.id]: newState } })
-    addToast(newState ? `${w.name} incluído na receita do Negócio` : `${w.name} removido da receita do Negócio`)
+  const workerTxIds = meta.worker_tx_ids || {}
+
+  const calcWorkerValue = (workerId) => {
+    const lotTotal = (parseInt(meta.qtd_pecas) || 0) * (parseFloat(meta.valor_unitario) || 0)
+    const pct = parseFloat((meta.worker_pcts || {})[workerId]) || 0
+    return Math.round(lotTotal * pct / 100 * 100) / 100
+  }
+
+  const toggleWorkerIncome = async (w, newState) => {
+    if (newState) {
+      const workerVal = calcWorkerValue(w.id)
+      const lot = appState.lots[lotIdx]
+      const saved = await addTx({
+        type: 'income',
+        description: `Facção – ${w.name}${lot?.description ? ' (' + lot.description + ')' : ''}`,
+        value: workerVal > 0 ? workerVal : 0,
+        date: todayStr(),
+        category: 'Negócio',
+        account: 'Pix',
+        paid: true,
+        notes: 'Receita de facção',
+      })
+      const txId = saved?.id
+      saveMeta({
+        worker_income: { ...workerIncome, [w.id]: true },
+        worker_tx_ids: { ...workerTxIds, [w.id]: txId || null },
+      })
+      addToast(`${w.name} incluído na receita do mês`)
+    } else {
+      const txId = workerTxIds[w.id]
+      if (txId) deleteTx(txId)
+      const updatedTxIds = { ...workerTxIds }
+      delete updatedTxIds[w.id]
+      saveMeta({
+        worker_income: { ...workerIncome, [w.id]: false },
+        worker_tx_ids: updatedTxIds,
+      })
+      addToast(`${w.name} removido da receita do mês`)
+    }
   }
 
   const handleAddWorker = async () => {
     if (!newWorkerName.trim()) return
     const w = await addWorker(lotIdx, newWorkerName.trim())
     if (newWorkerIsIncome && w) {
-      saveMeta({ worker_income: { ...workerIncome, [w.id]: true } })
+      const workerVal = calcWorkerValue(w.id)
+      const lot = appState.lots[lotIdx]
+      const saved = await addTx({
+        type: 'income',
+        description: `Facção – ${w.name}${lot?.description ? ' (' + lot.description + ')' : ''}`,
+        value: workerVal > 0 ? workerVal : 0,
+        date: todayStr(),
+        category: 'Negócio',
+        account: 'Pix',
+        paid: true,
+        notes: 'Receita de facção',
+      })
+      const txId = saved?.id
+      saveMeta({
+        worker_income: { ...workerIncome, [w.id]: true },
+        worker_tx_ids: { ...workerTxIds, [w.id]: txId || null },
+      })
     }
     setNewWorkerName('')
-    setNewWorkerIsIncome(false)
+    setNewWorkerIsIncome(true)
   }
 
   return (
