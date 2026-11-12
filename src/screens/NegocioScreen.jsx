@@ -1115,18 +1115,17 @@ function FaccoesTab({ lot, lotIdx }) {
     return Math.round(lotTotal * pct / 100 * 100) / 100
   }
 
-  // Sincroniza participantes já marcados como receita mas sem tx_id (retrocompatibilidade)
-  const syncedRef = useRef(false)
+  // Sincroniza participantes já marcados como receita mas sem tx_id
+  const pendingSync = workers.filter(w =>
+    (meta.worker_income || {})[w.id] === true && !(meta.worker_tx_ids || {})[w.id]
+  )
   useEffect(() => {
-    if (syncedRef.current || !workers.length) return
-    const currentIncome = meta.worker_income || {}
-    const currentTxIds = meta.worker_tx_ids || {}
-    const needsSync = workers.filter(w => currentIncome[w.id] === true && !currentTxIds[w.id])
-    if (!needsSync.length) { syncedRef.current = true; return }
-    syncedRef.current = true
+    if (!pendingSync.length) return
+    let cancelled = false
     ;(async () => {
-      const updatedTxIds = { ...currentTxIds }
-      for (const w of needsSync) {
+      const updatedTxIds = { ...(meta.worker_tx_ids || {}) }
+      for (const w of pendingSync) {
+        if (cancelled) return
         const val = calcWorkerValue(w.id)
         const saved = await addTx({
           type: 'income',
@@ -1138,12 +1137,15 @@ function FaccoesTab({ lot, lotIdx }) {
           paid: true,
           notes: 'Receita de facção',
         })
-        updatedTxIds[w.id] = saved?.id || null
+        if (saved?.id) updatedTxIds[w.id] = saved.id
       }
-      saveMeta({ worker_tx_ids: updatedTxIds })
-      addToast(`Receita sincronizada para ${needsSync.length} participante(s)`)
+      if (!cancelled) {
+        saveMeta({ worker_tx_ids: updatedTxIds })
+        addToast(`Receita de ${pendingSync.length} participante(s) lançada`)
+      }
     })()
-  }, [workers.length]) // eslint-disable-line
+    return () => { cancelled = true }
+  }, [pendingSync.length]) // eslint-disable-line
 
   const toggleWorkerIncome = async (w, newState) => {
     if (newState) {
