@@ -49,6 +49,7 @@ function reducer(state, action) {
     case 'DEL_GOAL': return { ...state, goals: state.goals.filter(g => g.id !== action.id) }
     case 'SET_LOTS': return { ...state, lots: action.lots }
     case 'ADD_LOT': return { ...state, lots: [...state.lots, action.lot] }
+    case 'DELETE_LOT': return { ...state, lots: state.lots.filter((_, i) => i !== action.idx), activeLotIdx: 0 }
     case 'UPDATE_LOT':
       return { ...state, lots: state.lots.map((l, i) => i === action.idx ? { ...l, ...action.data } : l) }
     case 'ADD_LOT_ITEM':
@@ -371,6 +372,14 @@ export function AppProvider({ children }) {
     } catch (err) { addToast(err.message, 'error') }
   }
 
+  const deleteLot = async (idx) => {
+    const lot = state.lots[idx]
+    dispatch({ type: 'DELETE_LOT', idx })
+    dispatch({ type: 'SET_LOT_IDX', idx: 0 })
+    try { await lotsAPI.delete(lot.id) }
+    catch (err) { addToast('Erro ao excluir lote', 'error') }
+  }
+
   const updateLot = async (idx, data) => {
     const lot = state.lots[idx]
     dispatch({ type: 'UPDATE_LOT', idx, data })
@@ -525,7 +534,7 @@ export function AppProvider({ children }) {
     addTx, updateTx, deleteTx, payCardBill, addFixo, deleteRecurringGroup, updateFixo, addReceitaFixa,
     saveBudget, deleteBudget,
     updateGoal, deleteGoal,
-    addLot, updateLot,
+    addLot, updateLot, deleteLot,
     addLotItem, updateLotItem, deleteItem,
     addExpense, deleteExpense,
     addWorker, updateWorker, deleteWorker, updateWorkerItem,

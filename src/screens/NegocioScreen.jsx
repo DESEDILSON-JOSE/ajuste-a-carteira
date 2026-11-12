@@ -852,8 +852,9 @@ function useLotMeta(lotId) {
 }
 
 function LotInfoCard({ lot, lotIdx }) {
-  const { updateLot } = useApp()
+  const { updateLot, deleteLot } = useApp()
   const [meta, saveMeta] = useLotMeta(lot.id)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
 
@@ -861,6 +862,7 @@ function LotInfoCard({ lot, lotIdx }) {
     setForm({
       name: lot.name || '',
       client: meta.client || '',
+      valor_lote: meta.valor_lote || '',
       status: meta.status || LOT_STATUS_OPTIONS[0],
       entry_date: meta.entry_date || '',
       delivery_date: meta.delivery_date || '',
@@ -871,7 +873,7 @@ function LotInfoCard({ lot, lotIdx }) {
 
   const saveEdit = () => {
     if (form.name.trim() && form.name !== lot.name) updateLot(lotIdx, { name: form.name.trim() })
-    saveMeta({ client: form.client, status: form.status, entry_date: form.entry_date, delivery_date: form.delivery_date, notes: form.notes })
+    saveMeta({ client: form.client, valor_lote: form.valor_lote, status: form.status, entry_date: form.entry_date, delivery_date: form.delivery_date, notes: form.notes })
     setEditing(false)
   }
 
@@ -898,6 +900,10 @@ function LotInfoCard({ lot, lotIdx }) {
           <input className="input" value={form.client} onChange={f('client')} placeholder="Nome do cliente ou empresa" />
         </div>
         <div>
+          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>💰 Valor Combinado do Lote</label>
+          <input className="input" type="number" inputMode="decimal" value={form.valor_lote} onChange={f('valor_lote')} placeholder="0,00" />
+        </div>
+        <div>
           <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Status</label>
           <select className="input" value={form.status} onChange={f('status')}>
             {LOT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -921,6 +927,19 @@ function LotInfoCard({ lot, lotIdx }) {
           <button className="btn btn-dark" style={{ flex: 1 }} onClick={saveEdit}>✓ Salvar</button>
           <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancelar</button>
         </div>
+        {confirmDelete ? (
+          <div style={{ marginTop: 8, background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 13, marginBottom: 10, color: '#f87171' }}>⚠️ Apagar o lote <strong>{lot.name}</strong> e todos os seus dados?</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sm" style={{ flex: 1, background: '#dc2626', color: '#fff', border: 'none' }} onClick={() => { deleteLot(lotIdx); setConfirmDelete(false); setEditing(false) }}>Sim, apagar</button>
+              <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Não</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDelete(true)} style={{ background: 'none', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, color: '#f87171', fontSize: 13, padding: '8px 12px', cursor: 'pointer', width: '100%', marginTop: 4 }}>
+            🗑 Apagar este lote
+          </button>
+        )}
       </div>
     </div>
   )
@@ -938,6 +957,9 @@ function LotInfoCard({ lot, lotIdx }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
             {meta.client && (
               <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>👤 Cliente</div><div style={{ fontWeight: 600 }}>{meta.client}</div></div>
+            )}
+            {meta.valor_lote && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>💰 Valor do Lote</div><div style={{ fontWeight: 700, color: '#4ade80' }}>{R$(parseFloat(meta.valor_lote))}</div></div>
             )}
             {meta.entry_date && (
               <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>📅 Entrada</div><div style={{ fontWeight: 600 }}>{new Date(meta.entry_date + 'T12:00:00').toLocaleDateString('pt-BR')}</div></div>

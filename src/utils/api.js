@@ -74,6 +74,8 @@ export const lotsAPI = {
   },
   update: async (id, data) =>
     handle(supabase.from('lots').update(data).eq('id', id)),
+  delete: async (id) =>
+    handle(supabase.from('lots').delete().eq('id', id)),
   addItem: async (item) => {
     const { data, error } = await supabase.from('lot_items').insert(item).select().single()
     if (error) throw error
