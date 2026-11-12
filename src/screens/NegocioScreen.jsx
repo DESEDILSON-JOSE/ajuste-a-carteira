@@ -1057,7 +1057,7 @@ function LotInfoCard({ lot, lotIdx }) {
 function FaccoesTab({ lot, lotIdx }) {
   const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
-  const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(false)
+  const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(true)
   const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
   const [meta, saveMeta] = useLotMeta(lot.id)
 
