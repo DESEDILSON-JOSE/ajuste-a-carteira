@@ -1055,6 +1055,8 @@ function LotInfoCard({ lot, lotIdx }) {
 function FaccoesTab({ lot, lotIdx }) {
   const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
+  const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(false)
+  const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
   const [meta, saveMeta] = useLotMeta(lot.id)
 
   const items = lot.lot_items || []
@@ -1112,114 +1114,107 @@ function FaccoesTab({ lot, lotIdx }) {
     addToast(`Lote ${lot.name} lançado como receita!`)
   }
 
+  // Worker income toggle: stored in meta.worker_income
+  const workerIncome = meta.worker_income || {}
+  const toggleWorkerIncome = async (w, newState) => {
+    saveMeta({ worker_income: { ...workerIncome, [w.id]: newState } })
+    if (newState) {
+      const pct = parseFloat(workerPcts[w.id] || 0)
+      const earned = (pct / 100) * lotTotal
+      if (earned > 0) await addFamilyIncomeTx(w.name, earned)
+      else addToast(`Defina o % de ${w.name} antes de lançar receita`, 'error')
+    }
+  }
+
+  const handleAddWorker = async () => {
+    if (!newWorkerName.trim()) return
+    const w = await addWorker(lotIdx, newWorkerName.trim())
+    if (newWorkerIsIncome && w) {
+      saveMeta({ worker_income: { ...workerIncome, [w.id]: true } })
+    }
+    setNewWorkerName('')
+    setNewWorkerIsIncome(false)
+  }
+
   return (
     <div>
       <LotInfoCard lot={lot} lotIdx={lotIdx} />
 
-      {/* ── PARTICIPANTES (junto ao cadastro) ── */}
+      {/* ── ITENS DESTE LOTE (com toggle para ver o mês) ── */}
       <div className="card">
-        <div className="card-title">👥 Participantes</div>
-        {workers.map(w => {
-          const pct = parseFloat(workerPcts[w.id] || 0)
-          const earned = (pct / 100) * lotTotal
-          const monthEarned = monthlyEarnings[w.id] || 0
-          return (
-            <div key={w.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>👤 {w.name}</div>
-                <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: '#94a3b8' }}>% do lote:</span>
-                <input className="tbl-input" type="number" inputMode="decimal" value={pct || ''} placeholder="0" style={{ width: 60, textAlign: 'right' }} onChange={e => setWorkerPct(w.id, parseFloat(e.target.value) || 0)} />
-                <span style={{ fontSize: 12, color: '#94a3b8' }}>%</span>
-                <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 15, color: '#4ade80' }}>{R$(earned)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                  Mês: <span style={{ color: '#60a5fa', fontWeight: 600 }}>{R$(monthEarned)}</span>
-                </div>
-                {earned > 0 && (
-                  <button className="btn btn-ghost btn-sm" style={{ color: '#4ade80', fontSize: 11, padding: '4px 10px' }} onClick={() => addFamilyIncomeTx(w.name, earned)}>
-                    📥 Lançar receita
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
-          <button className="btn btn-dark btn-sm" onClick={() => { if (newWorkerName.trim()) { addWorker(lotIdx, newWorkerName.trim()); setNewWorkerName('') } }}>+ Adicionar</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>
+            {itemsView === 'lote' ? '📦 Itens deste Lote' : '🧵 Produção Geral do Mês'}
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setItemsView('lote')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', background: itemsView === 'lote' ? '#3b82f6' : 'rgba(255,255,255,0.08)', color: itemsView === 'lote' ? '#fff' : '#94a3b8', fontWeight: itemsView === 'lote' ? 700 : 400 }}>Este Lote</button>
+            <button onClick={() => setItemsView('mes')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', background: itemsView === 'mes' ? '#3b82f6' : 'rgba(255,255,255,0.08)', color: itemsView === 'mes' ? '#fff' : '#94a3b8', fontWeight: itemsView === 'mes' ? 700 : 400 }}>Mês Completo</button>
+          </div>
         </div>
-      </div>
 
-      {/* ── PRODUÇÃO GERAL DO MÊS ── */}
-      <div className="card">
-        <div className="card-title">🧵 Produção Geral do Mês</div>
-        <div className="scroll-x">
-          <table className="tbl">
-            <thead><tr><th>REF</th><th>Produção</th><th>Cliente</th><th>Qtd</th><th>Vl/Pç</th><th>Total</th></tr></thead>
-            <tbody>
-              {monthLots.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '10px 0', fontSize: 12 }}>Nenhum lote com data de entrada neste mês</td></tr>
-              )}
-              {monthLots.map(({ lot: l, meta: m }) => {
-                const ref = l.name.split(' - ')[0] || l.name
-                const prod = l.name.split(' - ').slice(1).join(' - ') || l.name
-                const qty = parseInt(m.qtd_pecas) || 0
-                const vup = parseFloat(m.valor_unitario) || 0
-                const total = qty * vup
-                return (
-                  <tr key={l.id} style={{ opacity: l.id === lot.id ? 1 : 0.65 }}>
-                    <td style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{ref}</td>
-                    <td style={{ fontSize: 11 }}>{prod}</td>
-                    <td style={{ fontSize: 11 }}>{m.client || '—'}</td>
-                    <td style={{ fontSize: 11 }}>{qty || '—'}</td>
-                    <td style={{ fontSize: 11 }}>{vup > 0 ? R$(vup) : '—'}</td>
-                    <td style={{ fontWeight: 700, color: '#4ade80', fontSize: 12 }}>{total > 0 ? R$(total) : '—'}</td>
+        {itemsView === 'lote' ? (
+          <>
+            <div className="scroll-x">
+              <table className="tbl">
+                <thead><tr><th>REF</th><th>Descrição</th><th>Valor/pç</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
+                <tbody>
+                  {items.map(item => (
+                    <tr key={item.id}>
+                      <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
+                      <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
+                      <td><input className="tbl-input" style={{ width: 70 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
+                      <td><input className="tbl-input" style={{ width: 50 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
+                      <td style={{ fontWeight: 600, color: '#4ade80' }}>{R$((parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0))}</td>
+                      <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DAS PRODUÇÕES</td>
+                    <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</td>
+                    <td></td>
                   </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={5} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DO MÊS</td>
-                <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(monthLots.reduce((s, { meta: m }) => s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0))}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      {/* ── ITENS DESTE LOTE ── */}
-      <div className="card">
-        <div className="card-title">📦 Itens deste Lote</div>
-        <div className="scroll-x">
-          <table className="tbl">
-            <thead><tr><th>REF</th><th>Descrição</th><th>Valor/pç</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
-            <tbody>
-              {items.map(item => (
-                <tr key={item.id}>
-                  <td><input className="tbl-input" style={{ width: 50 }} value={item.ref || ''} onChange={e => setItemField(item, 'ref', e.target.value)} /></td>
-                  <td><input className="tbl-input" style={{ width: 100 }} value={item.description || ''} onChange={e => setItemField(item, 'description', e.target.value)} /></td>
-                  <td><input className="tbl-input" style={{ width: 70 }} type="number" inputMode="decimal" value={item.value || ''} onChange={e => setItemField(item, 'value', parseFloat(e.target.value) || 0)} /></td>
-                  <td><input className="tbl-input" style={{ width: 50 }} type="number" inputMode="numeric" value={item.quantity || ''} onChange={e => setItemField(item, 'quantity', parseInt(e.target.value) || 0)} /></td>
-                  <td style={{ fontWeight: 600, color: '#4ade80' }}>{R$((parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0))}</td>
-                  <td><button onClick={() => deleteItem(lotIdx, item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
+                </tfoot>
+              </table>
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
+          </>
+        ) : (
+          <div className="scroll-x">
+            <table className="tbl">
+              <thead><tr><th>REF</th><th>Produção</th><th>Cliente</th><th>Qtd</th><th>Vl/Pç</th><th>Total</th></tr></thead>
+              <tbody>
+                {monthLots.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '10px 0', fontSize: 12 }}>Nenhum lote com data de entrada neste mês</td></tr>
+                )}
+                {monthLots.map(({ lot: l, meta: m }) => {
+                  const ref = l.name.split(' - ')[0] || l.name
+                  const prod = l.name.split(' - ').slice(1).join(' - ') || l.name
+                  const qty = parseInt(m.qtd_pecas) || 0
+                  const vup = parseFloat(m.valor_unitario) || 0
+                  const total = qty * vup
+                  return (
+                    <tr key={l.id} style={{ opacity: l.id === lot.id ? 1 : 0.65 }}>
+                      <td style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{ref}</td>
+                      <td style={{ fontSize: 11 }}>{prod}</td>
+                      <td style={{ fontSize: 11 }}>{m.client || '—'}</td>
+                      <td style={{ fontSize: 11 }}>{qty || '—'}</td>
+                      <td style={{ fontSize: 11 }}>{vup > 0 ? R$(vup) : '—'}</td>
+                      <td style={{ fontWeight: 700, color: '#4ade80', fontSize: 12 }}>{total > 0 ? R$(total) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DO MÊS</td>
+                  <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(monthLots.reduce((s, { meta: m }) => s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0))}</td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DAS PRODUÇÕES</td>
-                <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(totalProd)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addLotItem(lotIdx)}>+ Peça</button>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -1246,6 +1241,56 @@ function FaccoesTab({ lot, lotIdx }) {
           </table>
         </div>
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
+      </div>
+
+      {/* ── PARTICIPANTES — após gastos ── */}
+      <div className="card">
+        <div className="card-title">👥 Participantes</div>
+        {workers.map(w => {
+          const pct = parseFloat(workerPcts[w.id] || 0)
+          const earned = (pct / 100) * lotTotal
+          const monthEarned = monthlyEarnings[w.id] || 0
+          const isIncome = !!workerIncome[w.id]
+          return (
+            <div key={w.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>👤 {w.name}</div>
+                <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>% do lote:</span>
+                <input className="tbl-input" type="number" inputMode="decimal" value={pct || ''} placeholder="0" style={{ width: 60, textAlign: 'right' }} onChange={e => setWorkerPct(w.id, parseFloat(e.target.value) || 0)} />
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>%</span>
+                <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 15, color: '#4ade80' }}>{R$(earned)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                  Mês acumulado: <span style={{ color: '#60a5fa', fontWeight: 600 }}>{R$(monthEarned)}</span>
+                </div>
+                <button
+                  onClick={() => toggleWorkerIncome(w, !isIncome)}
+                  style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', background: isIncome ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.08)', color: isIncome ? '#4ade80' : '#94a3b8', fontWeight: isIncome ? 700 : 400 }}
+                >
+                  {isIncome ? '💰 Receita ativa' : '➕ Receita mensal'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Adicionar novo participante */}
+        <div style={{ marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)' }}>
+          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ marginBottom: 8 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => setNewWorkerIsIncome(v => !v)}
+              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', background: newWorkerIsIncome ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.08)', color: newWorkerIsIncome ? '#4ade80' : '#94a3b8' }}
+            >
+              {newWorkerIsIncome ? '💰 Vai entrar na receita mensal' : '➕ Adicionar à receita mensal?'}
+            </button>
+            <button className="btn btn-dark btn-sm" onClick={handleAddWorker}>+ Adicionar</button>
+          </div>
+        </div>
       </div>
 
       {(lotTotal > 0 || totalProd > 0) && (
@@ -1287,11 +1332,6 @@ function FaccoesTab({ lot, lotIdx }) {
               </div>
             </div>
           </div>
-          {lotTotal > 0 && (
-            <button className="btn btn-dark btn-full" style={{ marginTop: 14 }} onClick={addLotIncomeTx}>
-              📥 Lançar {lot.name} como receita do mês
-            </button>
-          )}
         </div>
       )}
     </div>
