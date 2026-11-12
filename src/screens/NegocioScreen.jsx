@@ -57,17 +57,9 @@ function VisaoGeralTab({ biz }) {
     }).filter(({ meta }) => (meta.entry_date || '').substring(0, 7) === selMonth)
   }, [appState.lots, selMonth])
 
-  // Soma apenas o que cabe aos participantes marcados como receita mensal
-  const faccaoRevenue = monthFaccoesLots.reduce((s, { meta: m }) => {
-    const lotTotal = (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0)
-    if (lotTotal === 0) return s
-    const pcts = m.worker_pcts || {}
-    const income = m.worker_income || {}
-    const participantShare = Object.entries(income)
-      .filter(([, on]) => on)
-      .reduce((sum, [wid]) => sum + ((parseFloat(pcts[wid]) || 0) / 100) * lotTotal, 0)
-    return s + participantShare
-  }, 0)
+  // Soma o total de todos os lotes do mês no Painel Negócio (não vai para o app financeiro)
+  const faccaoRevenue = monthFaccoesLots.reduce((s, { meta: m }) =>
+    s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0)
 
   const totalRevenue = salesRevenue + cfIncome + faccaoRevenue
   const totalExpense = cfExpense
