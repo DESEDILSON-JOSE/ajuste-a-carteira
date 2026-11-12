@@ -62,7 +62,9 @@ function VisaoGeralTab({ biz }) {
     s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0)
 
   const totalRevenue = salesRevenue + cfIncome + faccaoRevenue
-  const totalExpense = cfExpense
+  const lotExpenses = monthFaccoesLots.reduce((sum, { lot }) =>
+    sum + (lot.lot_expenses || []).reduce((s, e) => s + (parseFloat(e.value) || 0), 0), 0)
+  const totalExpense = cfExpense + lotExpenses
   const profit = totalRevenue - totalExpense
   const goal = parseFloat(profile?.monthly_goal) || 0
   const goalPct = goal > 0 ? Math.min(100, (totalRevenue / goal) * 100) : 0
@@ -1057,6 +1059,7 @@ function LotInfoCard({ lot, lotIdx }) {
 function FaccoesTab({ lot, lotIdx }) {
   const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, updateExpense, deleteExpense, addWorker, deleteWorker, addTx, deleteTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
+  const [expenseDrafts, setExpenseDrafts] = useState({})
   const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
   const [meta, saveMeta] = useLotMeta(lot.id)
 
@@ -1288,35 +1291,51 @@ function FaccoesTab({ lot, lotIdx }) {
         </div>
 
         {expenses.map(e => {
-          const upd = (field, val) => updateExpense(lotIdx, e.id, { [field]: val })
+          const draft = expenseDrafts[e.id] || {}
+          const val = (field) => field in draft ? draft[field] : (e[field] ?? '')
+          const setDraft = (field, v) => setExpenseDrafts(prev => ({ ...prev, [e.id]: { ...(prev[e.id] || {}), [field]: v } }))
+          const hasDraft = Object.keys(draft).length > 0
+          const saveExpense = () => {
+            if (hasDraft) {
+              updateExpense(lotIdx, e.id, draft)
+              setExpenseDrafts(prev => { const n = { ...prev }; delete n[e.id]; return n })
+              addToast('Gasto salvo!')
+            }
+          }
           return (
-            <div key={e.id} style={{ marginBottom: 10, padding: '12px', background: 'rgba(248,113,113,0.06)', borderRadius: 10, border: '1px solid rgba(248,113,113,0.15)' }}>
+            <div key={e.id} style={{ marginBottom: 10, padding: '12px', background: 'rgba(248,113,113,0.06)', borderRadius: 10, border: `1px solid ${hasDraft ? 'rgba(251,191,36,0.4)' : 'rgba(248,113,113,0.15)'}` }}>
               {/* linha 1: data + categoria + valor + lixo */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <input className="tbl-input" type="date" value={e.date || ''} style={{ width: 130, fontSize: 11 }} onChange={ev => upd('date', ev.target.value)} />
-                <select className="tbl-input" value={e.categoria || 'Outros'} style={{ flex: 1, fontSize: 11 }} onChange={ev => upd('categoria', ev.target.value)}>
+                <input className="tbl-input" type="date" value={val('date')} style={{ width: 130, fontSize: 11 }} onChange={ev => setDraft('date', ev.target.value)} />
+                <select className="tbl-input" value={val('categoria') || 'Outros'} style={{ flex: 1, fontSize: 11 }} onChange={ev => setDraft('categoria', ev.target.value)}>
                   {['Material','Serviço','Transporte','Aluguel','Alimentação','Energia','Manutenção','Outros'].map(c => <option key={c}>{c}</option>)}
                 </select>
-                <input className="tbl-input" type="number" inputMode="decimal" value={e.value || ''} placeholder="0,00" style={{ width: 90, fontWeight: 700, color: '#f87171', textAlign: 'right' }} onChange={ev => upd('value', parseFloat(ev.target.value) || 0)} />
+                <input className="tbl-input" type="number" inputMode="decimal" value={val('value')} placeholder="0,00" style={{ width: 90, fontWeight: 700, color: '#f87171', textAlign: 'right' }} onChange={ev => setDraft('value', parseFloat(ev.target.value) || 0)} />
                 <button onClick={() => deleteExpense(lotIdx, e.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, flexShrink: 0 }}>🗑</button>
               </div>
               {/* linha 2: descrição */}
-              <input className="tbl-input" value={e.description || ''} placeholder="Descrição do gasto" style={{ width: '100%', marginBottom: 8 }} onChange={ev => upd('description', ev.target.value)} />
+              <input className="tbl-input" value={val('description')} placeholder="Descrição do gasto" style={{ width: '100%', marginBottom: 8 }} onChange={ev => setDraft('description', ev.target.value)} />
               {/* linha 3: fornecedor + forma_pagamento + status */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <input className="tbl-input" value={e.fornecedor || ''} placeholder="Fornecedor" style={{ flex: 1, fontSize: 11 }} onChange={ev => upd('fornecedor', ev.target.value)} />
-                <select className="tbl-input" value={e.forma_pagamento || 'Pix'} style={{ width: 110, fontSize: 11 }} onChange={ev => upd('forma_pagamento', ev.target.value)}>
+                <input className="tbl-input" value={val('fornecedor')} placeholder="Fornecedor" style={{ flex: 1, fontSize: 11 }} onChange={ev => setDraft('fornecedor', ev.target.value)} />
+                <select className="tbl-input" value={val('forma_pagamento') || 'Pix'} style={{ width: 110, fontSize: 11 }} onChange={ev => setDraft('forma_pagamento', ev.target.value)}>
                   {['Dinheiro','Pix','Cartão','Boleto','Transferência','Outros'].map(f => <option key={f}>{f}</option>)}
                 </select>
                 <button
-                  onClick={() => upd('status', e.status === 'pago' ? 'pendente' : 'pago')}
-                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', flexShrink: 0, background: e.status === 'pago' ? 'rgba(74,222,128,0.2)' : 'rgba(251,191,36,0.2)', color: e.status === 'pago' ? '#4ade80' : '#fbbf24' }}
+                  onClick={() => setDraft('status', val('status') === 'pago' ? 'pendente' : 'pago')}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', flexShrink: 0, background: val('status') === 'pago' ? 'rgba(74,222,128,0.2)' : 'rgba(251,191,36,0.2)', color: val('status') === 'pago' ? '#4ade80' : '#fbbf24' }}
                 >
-                  {e.status === 'pago' ? '✅ Pago' : '⏳ Pendente'}
+                  {val('status') === 'pago' ? '✅ Pago' : '⏳ Pendente'}
                 </button>
               </div>
               {/* linha 4: observações */}
-              <input className="tbl-input" value={e.observacoes || ''} placeholder="Observações (opcional)" style={{ width: '100%', fontSize: 11, color: '#94a3b8' }} onChange={ev => upd('observacoes', ev.target.value)} />
+              <input className="tbl-input" value={val('observacoes')} placeholder="Observações (opcional)" style={{ width: '100%', fontSize: 11, color: '#94a3b8', marginBottom: hasDraft ? 8 : 0 }} onChange={ev => setDraft('observacoes', ev.target.value)} />
+              {/* botão salvar — só aparece quando há alterações */}
+              {hasDraft && (
+                <button onClick={saveExpense} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(74,222,128,0.2)', color: '#4ade80', fontWeight: 700, fontSize: 13 }}>
+                  ✓ Salvar Gasto
+                </button>
+              )}
             </div>
           )
         })}
