@@ -276,7 +276,7 @@ function ReceitaPrevistaTab() {
           </div>
         </div>
       ) : (
-        <button className="btn btn-dark btn-full" onClick={() => setShowForm(true)}>+ Adicionar Receita Fixa</button>
+        <button className="btn btn-dark btn-full" style={{ marginBottom: 16 }} onClick={() => setShowForm(true)}>+ Adicionar Receita Fixa</button>
       )}
 
       {receitas.length > 0 && (
