@@ -1206,6 +1206,19 @@ function FaccoesTab({ lot, lotIdx }) {
     setNewWorkerIsIncome(true)
   }
 
+  const handleDeleteWorker = (w) => {
+    // Remove a transação de receita associada antes de deletar
+    const txId = (meta.worker_tx_ids || {})[w.id]
+    if (txId) deleteTx(txId)
+    // Limpa do meta
+    const updatedIncome = { ...(meta.worker_income || {}) }
+    const updatedTxIds = { ...(meta.worker_tx_ids || {}) }
+    delete updatedIncome[w.id]
+    delete updatedTxIds[w.id]
+    saveMeta({ worker_income: updatedIncome, worker_tx_ids: updatedTxIds })
+    deleteWorker(lotIdx, w.id)
+  }
+
   return (
     <div>
       <LotInfoCard lot={lot} lotIdx={lotIdx} />
@@ -1349,7 +1362,7 @@ function FaccoesTab({ lot, lotIdx }) {
             <div key={w.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>👤 {w.name}</div>
-                <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+                <button onClick={() => handleDeleteWorker(w)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#94a3b8' }}>% do lote:</span>
