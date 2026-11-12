@@ -862,7 +862,8 @@ function LotInfoCard({ lot, lotIdx }) {
     setForm({
       name: lot.name || '',
       client: meta.client || '',
-      valor_lote: meta.valor_lote || '',
+      qtd_pecas: meta.qtd_pecas || '',
+      valor_unitario: meta.valor_unitario || '',
       status: meta.status || LOT_STATUS_OPTIONS[0],
       entry_date: meta.entry_date || '',
       delivery_date: meta.delivery_date || '',
@@ -873,7 +874,7 @@ function LotInfoCard({ lot, lotIdx }) {
 
   const saveEdit = () => {
     if (form.name.trim() && form.name !== lot.name) updateLot(lotIdx, { name: form.name.trim() })
-    saveMeta({ client: form.client, valor_lote: form.valor_lote, status: form.status, entry_date: form.entry_date, delivery_date: form.delivery_date, notes: form.notes })
+    saveMeta({ client: form.client, qtd_pecas: form.qtd_pecas, valor_unitario: form.valor_unitario, status: form.status, entry_date: form.entry_date, delivery_date: form.delivery_date, notes: form.notes })
     setEditing(false)
   }
 
@@ -899,10 +900,22 @@ function LotInfoCard({ lot, lotIdx }) {
           <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Cliente / Empresa</label>
           <input className="input" value={form.client} onChange={f('client')} placeholder="Nome do cliente ou empresa" />
         </div>
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>💰 Valor Combinado do Lote</label>
-          <input className="input" type="number" inputMode="decimal" value={form.valor_lote} onChange={f('valor_lote')} placeholder="0,00" />
+        <div className="g2">
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>📦 Qtd de Peças</label>
+            <input className="input" type="number" inputMode="numeric" value={form.qtd_pecas} onChange={f('qtd_pecas')} placeholder="0" />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>💵 Valor por Peça</label>
+            <input className="input" type="number" inputMode="decimal" value={form.valor_unitario} onChange={f('valor_unitario')} placeholder="0,00" />
+          </div>
         </div>
+        {form.qtd_pecas && form.valor_unitario && (
+          <div style={{ background: 'rgba(74,222,128,0.1)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--cinza)' }}>💰 Valor Total do Lote</span>
+            <span style={{ fontWeight: 700, color: '#4ade80', fontSize: 15 }}>{R$((parseFloat(form.qtd_pecas) || 0) * (parseFloat(form.valor_unitario) || 0))}</span>
+          </div>
+        )}
         <div>
           <label style={{ fontSize: 12, color: 'var(--cinza)', display: 'block', marginBottom: 4 }}>Status</label>
           <select className="input" value={form.status} onChange={f('status')}>
@@ -958,8 +971,11 @@ function LotInfoCard({ lot, lotIdx }) {
             {meta.client && (
               <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>👤 Cliente</div><div style={{ fontWeight: 600 }}>{meta.client}</div></div>
             )}
-            {meta.valor_lote && (
-              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>💰 Valor do Lote</div><div style={{ fontWeight: 700, color: '#4ade80' }}>{R$(parseFloat(meta.valor_lote))}</div></div>
+            {meta.qtd_pecas && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>📦 Qtd Peças</div><div style={{ fontWeight: 600 }}>{meta.qtd_pecas} un</div></div>
+            )}
+            {meta.valor_unitario && (
+              <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>💵 Valor/Peça</div><div style={{ fontWeight: 600 }}>{R$(parseFloat(meta.valor_unitario))}</div></div>
             )}
             {meta.entry_date && (
               <div><div style={{ color: 'var(--cinza)', fontSize: 11 }}>📅 Entrada</div><div style={{ fontWeight: 600 }}>{new Date(meta.entry_date + 'T12:00:00').toLocaleDateString('pt-BR')}</div></div>
@@ -971,6 +987,12 @@ function LotInfoCard({ lot, lotIdx }) {
           {meta.notes && (
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--cinza)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
               📝 {meta.notes}
+            </div>
+          )}
+          {meta.qtd_pecas && meta.valor_unitario && (
+            <div style={{ marginTop: 8, background: 'rgba(74,222,128,0.1)', borderRadius: 8, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--cinza)' }}>💰 Valor Total</span>
+              <span style={{ fontWeight: 700, color: '#4ade80' }}>{R$((parseFloat(meta.qtd_pecas) || 0) * (parseFloat(meta.valor_unitario) || 0))}</span>
             </div>
           )}
           {!meta.client && !meta.entry_date && !meta.delivery_date && (
@@ -1554,8 +1576,14 @@ export default function NegocioScreen() {
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
                 {lots.map((l, i) => (
                   <button key={l.id} onClick={() => dispatch({ type: 'SET_LOT_IDX', idx: i })}
-                    className={`btn btn-sm ${i === activeLotIdx ? 'btn-dark' : 'btn-ghost'}`} style={{ whiteSpace: 'nowrap' }}>
-                    {l.name}
+                    className={`btn btn-sm ${i === activeLotIdx ? 'btn-dark' : 'btn-ghost'}`}
+                    style={{ whiteSpace: 'nowrap', textAlign: 'left', lineHeight: 1.2, padding: '6px 12px' }}>
+                    {(() => {
+                      const parts = l.name.split(' - ')
+                      return parts.length > 1
+                        ? <><div style={{ fontWeight: 700 }}>{parts[0]}</div><div style={{ fontSize: 10, opacity: 0.75 }}>{parts.slice(1).join(' - ')}</div></>
+                        : l.name
+                    })()}
                   </button>
                 ))}
                 {!showNewLot && (
