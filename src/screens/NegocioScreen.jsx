@@ -1113,27 +1113,11 @@ function FaccoesTab({ lot, lotIdx }) {
 
   const setItemField = (item, key, val) => updateLotItem(lotIdx, item.id, { [key]: val })
 
-  const addFamilyIncomeTx = async (workerName, earned) => {
-    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${workerName}`, value: earned, date: todayStr(), account: 'Pix', paid: true })
-    addToast(`Renda de ${workerName} lançada!`)
-  }
-
-  const addLotIncomeTx = async () => {
-    if (lotTotal <= 0) { addToast('Valor Total do lote precisa estar preenchido', 'error'); return }
-    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${lot.name}`, value: lotTotal, date: todayStr(), account: 'Pix', paid: true })
-    addToast(`Lote ${lot.name} lançado como receita!`)
-  }
-
-  // Worker income toggle: stored in meta.worker_income
+  // Worker income toggle: só salva no meta, sem criar transação real
   const workerIncome = meta.worker_income || {}
-  const toggleWorkerIncome = async (w, newState) => {
+  const toggleWorkerIncome = (w, newState) => {
     saveMeta({ worker_income: { ...workerIncome, [w.id]: newState } })
-    if (newState) {
-      const pct = parseFloat(workerPcts[w.id] || 0)
-      const earned = (pct / 100) * lotTotal
-      if (earned > 0) await addFamilyIncomeTx(w.name, earned)
-      else addToast(`Defina o % de ${w.name} antes de lançar receita`, 'error')
-    }
+    addToast(newState ? `${w.name} incluído na receita do Negócio` : `${w.name} removido da receita do Negócio`)
   }
 
   const handleAddWorker = async () => {
