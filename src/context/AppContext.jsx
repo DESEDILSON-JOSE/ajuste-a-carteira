@@ -16,7 +16,7 @@ const initialState = {
   selM: new Date().getMonth() + 1,
   selY: new Date().getFullYear(),
   activeLotIdx: 0,
-  activeNegTab: 'faccoes',
+  activeNegTab: 'visao',
   transactions: [],
   goals: [],
   lots: [],
