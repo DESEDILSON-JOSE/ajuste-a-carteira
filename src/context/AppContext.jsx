@@ -125,7 +125,15 @@ export function AppProvider({ children }) {
         const retry = await profileAPI.get(userId)
         profileData = retry.data
       }
-      if (profileData) dispatch({ type: 'SET_PROFILE', profile: profileData })
+      if (profileData) {
+        // Auto-set start_month para novos usuários (ou usuários sem start_month definido)
+        if (!profileData.start_month) {
+          const curMonth = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
+          profileData = { ...profileData, start_month: curMonth }
+          profileAPI.update(userId, { start_month: curMonth }).catch(() => {})
+        }
+        dispatch({ type: 'SET_PROFILE', profile: profileData })
+      }
       dispatch({ type: 'SET_TXS', transactions: txs || [] })
       let finalGoals = goals || []
       if (finalGoals.length === 0) {
