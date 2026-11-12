@@ -62,6 +62,8 @@ function reducer(state, action) {
       return { ...state, lots: state.lots.map((l, i) => i === action.lotIdx ? { ...l, lot_expenses: [...(l.lot_expenses || []), action.expense] } : l) }
     case 'DEL_LOT_EXPENSE':
       return { ...state, lots: state.lots.map((l, i) => i === action.lotIdx ? { ...l, lot_expenses: (l.lot_expenses || []).filter(e => e.id !== action.expId) } : l) }
+    case 'UPDATE_LOT_EXPENSE':
+      return { ...state, lots: state.lots.map((l, i) => i === action.lotIdx ? { ...l, lot_expenses: (l.lot_expenses || []).map(e => e.id === action.expId ? { ...e, ...action.data } : e) } : l) }
     case 'ADD_LOT_WORKER':
       return { ...state, lots: state.lots.map((l, i) => i === action.lotIdx ? { ...l, workers: [...(l.workers || []), action.worker] } : l) }
     case 'UPDATE_WORKER_ITEM':
@@ -417,10 +419,18 @@ export function AppProvider({ children }) {
     try {
       const expense = await lotsAPI.addExpense({
         lot_id: lot.id, user_id: state.user.id,
-        description: 'Novo gasto', value: 0, date: todayStr(),
+        description: '', value: 0, date: todayStr(),
+        categoria: 'Outros', fornecedor: '', forma_pagamento: 'Pix',
+        status: 'pago', observacoes: '',
       })
       dispatch({ type: 'ADD_LOT_EXPENSE', lotIdx, expense })
     } catch (err) { addToast(err.message, 'error') }
+  }
+
+  const updateExpense = async (lotIdx, expId, data) => {
+    dispatch({ type: 'UPDATE_LOT_EXPENSE', lotIdx, expId, data })
+    try { await lotsAPI.updateExpense(expId, data) }
+    catch (err) { addToast('Erro ao salvar gasto', 'error') }
   }
 
   const deleteExpense = async (lotIdx, expId) => {
@@ -536,7 +546,7 @@ export function AppProvider({ children }) {
     updateGoal, deleteGoal,
     addLot, updateLot, deleteLot,
     addLotItem, updateLotItem, deleteItem,
-    addExpense, deleteExpense,
+    addExpense, updateExpense, deleteExpense,
     addWorker, updateWorker, deleteWorker, updateWorkerItem,
     upsertVPL, deleteVPL,
     updateIncome, addCustomCategory, removeCustomCategory,

@@ -1055,7 +1055,7 @@ function LotInfoCard({ lot, lotIdx }) {
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
+  const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, updateExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
   const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(true)
   const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
@@ -1204,29 +1204,53 @@ function FaccoesTab({ lot, lotIdx }) {
       </div>
 
       <div className="card">
-        <div className="card-title">💸 Gastos com as Facções</div>
-        <div className="scroll-x">
-          <table className="tbl">
-            <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
-            <tbody>
-              {expenses.map(e => (
-                <tr key={e.id}>
-                  <td style={{ fontSize: 11, color: '#94a3b8' }}>{e.date}</td>
-                  <td>{e.description}</td>
-                  <td style={{ fontWeight: 600, color: '#f87171' }}>{R$(e.value)}</td>
-                  <td><button onClick={() => deleteExpense(lotIdx, e.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>🗑</button></td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={2} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DE GASTOS</td>
-                <td colSpan={2} style={{ fontWeight: 700, color: '#f87171' }}>{totalExp > 0 ? R$(totalExp) : '—'}</td>
-              </tr>
-            </tfoot>
-          </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>💸 Gastos com as Facções</div>
+          {totalExp > 0 && <span style={{ fontWeight: 700, color: '#f87171', fontSize: 15 }}>{R$(totalExp)}</span>}
         </div>
-        <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
+
+        {expenses.map(e => {
+          const upd = (field, val) => updateExpense(lotIdx, e.id, { [field]: val })
+          return (
+            <div key={e.id} style={{ marginBottom: 10, padding: '12px', background: 'rgba(248,113,113,0.06)', borderRadius: 10, border: '1px solid rgba(248,113,113,0.15)' }}>
+              {/* linha 1: data + categoria + valor + lixo */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <input className="tbl-input" type="date" value={e.date || ''} style={{ width: 130, fontSize: 11 }} onChange={ev => upd('date', ev.target.value)} />
+                <select className="tbl-input" value={e.categoria || 'Outros'} style={{ flex: 1, fontSize: 11 }} onChange={ev => upd('categoria', ev.target.value)}>
+                  {['Material','Serviço','Transporte','Aluguel','Alimentação','Energia','Manutenção','Outros'].map(c => <option key={c}>{c}</option>)}
+                </select>
+                <input className="tbl-input" type="number" inputMode="decimal" value={e.value || ''} placeholder="0,00" style={{ width: 90, fontWeight: 700, color: '#f87171', textAlign: 'right' }} onChange={ev => upd('value', parseFloat(ev.target.value) || 0)} />
+                <button onClick={() => deleteExpense(lotIdx, e.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, flexShrink: 0 }}>🗑</button>
+              </div>
+              {/* linha 2: descrição */}
+              <input className="tbl-input" value={e.description || ''} placeholder="Descrição do gasto" style={{ width: '100%', marginBottom: 8 }} onChange={ev => upd('description', ev.target.value)} />
+              {/* linha 3: fornecedor + forma_pagamento + status */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <input className="tbl-input" value={e.fornecedor || ''} placeholder="Fornecedor" style={{ flex: 1, fontSize: 11 }} onChange={ev => upd('fornecedor', ev.target.value)} />
+                <select className="tbl-input" value={e.forma_pagamento || 'Pix'} style={{ width: 110, fontSize: 11 }} onChange={ev => upd('forma_pagamento', ev.target.value)}>
+                  {['Dinheiro','Pix','Cartão','Boleto','Transferência','Outros'].map(f => <option key={f}>{f}</option>)}
+                </select>
+                <button
+                  onClick={() => upd('status', e.status === 'pago' ? 'pendente' : 'pago')}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', flexShrink: 0, background: e.status === 'pago' ? 'rgba(74,222,128,0.2)' : 'rgba(251,191,36,0.2)', color: e.status === 'pago' ? '#4ade80' : '#fbbf24' }}
+                >
+                  {e.status === 'pago' ? '✅ Pago' : '⏳ Pendente'}
+                </button>
+              </div>
+              {/* linha 4: observações */}
+              <input className="tbl-input" value={e.observacoes || ''} placeholder="Observações (opcional)" style={{ width: '100%', fontSize: 11, color: '#94a3b8' }} onChange={ev => upd('observacoes', ev.target.value)} />
+            </div>
+          )
+        })}
+
+        {expenses.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 12, padding: '12px 0' }}>Nenhum gasto cadastrado</div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => addExpense(lotIdx)}>+ Gasto</button>
+          {totalExp > 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>Total: <strong style={{ color: '#f87171' }}>{R$(totalExp)}</strong></span>}
+        </div>
       </div>
 
       {/* ── PARTICIPANTES — após gastos ── */}
