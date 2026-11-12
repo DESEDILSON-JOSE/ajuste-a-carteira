@@ -840,9 +840,9 @@ const LOT_STATUS_OPTIONS = ['Em Produção', 'Aguardando', 'Pronto para Entregar
 function useLotMeta(lotId) {
   const key = `lot_meta_${lotId}`
   const read = () => {
-    try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} }
+    try { return JSON.parse(localStorage.getItem(key) || '{}') } catch (e) { return {} }
   }
-  const [meta, setMetaState] = React.useState(read)
+  const [meta, setMetaState] = useState(read)
   const save = (updates) => {
     const next = { ...meta, ...updates }
     try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
@@ -854,8 +854,8 @@ function useLotMeta(lotId) {
 function LotInfoCard({ lot, lotIdx }) {
   const { updateLot } = useApp()
   const [meta, saveMeta] = useLotMeta(lot.id)
-  const [editing, setEditing] = React.useState(false)
-  const [form, setForm] = React.useState({})
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({})
 
   const startEdit = () => {
     setForm({
