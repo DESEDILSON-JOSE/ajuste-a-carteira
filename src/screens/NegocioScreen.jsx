@@ -38,6 +38,7 @@ const monthOptions = () => {
 function VisaoGeralTab({ biz }) {
   const [selMonth, setSelMonth] = useState(nowMonth())
   const { profile, sales, cashflow } = biz
+  const { state: appState } = useApp()
 
   const monthSales = useMemo(() => sales.filter(s => s.date?.startsWith(selMonth)), [sales, selMonth])
   const paidSales = useMemo(() => monthSales.filter(s => s.status === 'paid'), [monthSales])
@@ -48,7 +49,17 @@ function VisaoGeralTab({ biz }) {
   const cfIncome = cfMonth.filter(cf => cf.type === 'entrada').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
   const cfExpense = cfMonth.filter(cf => cf.type === 'saida').reduce((s, x) => s + (parseFloat(x.value) || 0), 0)
 
-  const totalRevenue = salesRevenue + cfIncome
+  // Facção lots for selected month
+  const monthFaccoesLots = useMemo(() => {
+    return appState.lots.map(l => {
+      try { return { lot: l, meta: JSON.parse(localStorage.getItem(`lot_meta_${l.id}`) || '{}') } }
+      catch (e) { return { lot: l, meta: {} } }
+    }).filter(({ meta }) => (meta.entry_date || '').substring(0, 7) === selMonth)
+  }, [appState.lots, selMonth])
+
+  const faccaoRevenue = monthFaccoesLots.reduce((s, { meta: m }) => s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0)
+
+  const totalRevenue = salesRevenue + cfIncome + faccaoRevenue
   const totalExpense = cfExpense
   const profit = totalRevenue - totalExpense
   const goal = parseFloat(profile?.monthly_goal) || 0
@@ -138,11 +149,45 @@ function VisaoGeralTab({ biz }) {
         </div>
       )}
 
-      {monthSales.length === 0 && cfMonth.length === 0 && (
+      {monthFaccoesLots.length > 0 && (
+        <div className="card">
+          <div className="card-title">🏭 Produção Facções do Mês</div>
+          <div className="scroll-x">
+            <table className="tbl">
+              <thead><tr><th>REF</th><th>Produção</th><th>Cliente</th><th>Qtd</th><th>Total</th></tr></thead>
+              <tbody>
+                {monthFaccoesLots.map(({ lot: l, meta: m }) => {
+                  const ref = l.name.split(' - ')[0] || l.name
+                  const prod = l.name.split(' - ').slice(1).join(' - ') || l.name
+                  const qty = parseInt(m.qtd_pecas) || 0
+                  const total = qty * (parseFloat(m.valor_unitario) || 0)
+                  return (
+                    <tr key={l.id}>
+                      <td style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{ref}</td>
+                      <td style={{ fontSize: 12 }}>{prod}</td>
+                      <td style={{ fontSize: 11 }}>{m.client || '—'}</td>
+                      <td>{qty || '—'}</td>
+                      <td style={{ fontWeight: 700, color: '#4ade80' }}>{total > 0 ? R$(total) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL FACÇÕES</td>
+                  <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(faccaoRevenue)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {monthSales.length === 0 && cfMonth.length === 0 && monthFaccoesLots.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
           <div style={{ fontSize: 40 }}>📊</div>
           <div style={{ marginTop: 8, fontWeight: 600 }}>Sem movimentação neste mês</div>
-          <div style={{ fontSize: 12, marginTop: 4 }}>Registre vendas e lançamentos no Caixa</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Registre vendas, facções e lançamentos no Caixa</div>
         </div>
       )}
     </div>
@@ -1008,18 +1053,51 @@ function LotInfoCard({ lot, lotIdx }) {
 
 // ─── FACÇÕES TAB ─────────────────────────────────────────────
 function FaccoesTab({ lot, lotIdx }) {
-  const { updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, updateWorkerItem, addTx, addToast } = useApp()
+  const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, deleteExpense, addWorker, deleteWorker, addTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
+  const [meta, saveMeta] = useLotMeta(lot.id)
 
   const items = lot.lot_items || []
   const expenses = lot.lot_expenses || []
   const workers = lot.workers || []
 
+  const lotTotal = (parseInt(meta.qtd_pecas) || 0) * (parseFloat(meta.valor_unitario) || 0)
   const totalProd = items.reduce((s, i) => s + (parseFloat(i.value) || 0) * (parseInt(i.quantity) || 0), 0)
   const totalExp = expenses.reduce((s, e) => s + (parseFloat(e.value) || 0), 0)
   const netResult = totalProd - totalExp
   const days = parseInt(lot.work_days) || 0
   const dailyRate = days > 0 ? netResult / days : 0
+
+  // Worker % from lot meta
+  const workerPcts = meta.worker_pcts || {}
+  const setWorkerPct = (workerId, pct) => saveMeta({ worker_pcts: { ...workerPcts, [workerId]: pct } })
+
+  const curMonth = nowMonth()
+
+  // All lots for the current month
+  const monthLots = useMemo(() => {
+    return appState.lots.map(l => {
+      try { return { lot: l, meta: JSON.parse(localStorage.getItem(`lot_meta_${l.id}`) || '{}') } }
+      catch (e) { return { lot: l, meta: {} } }
+    }).filter(({ meta: m }) => (m.entry_date || '').substring(0, 7) === curMonth)
+  }, [appState.lots, curMonth])
+
+  // Monthly earnings per worker across all lots
+  const monthlyEarnings = useMemo(() => {
+    const earnings = {}
+    appState.lots.forEach(l => {
+      try {
+        const m = JSON.parse(localStorage.getItem(`lot_meta_${l.id}`) || '{}')
+        if ((m.entry_date || '').substring(0, 7) !== curMonth) return
+        const lt = (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0)
+        const pcts = m.worker_pcts || {}
+        Object.entries(pcts).forEach(([wid, p]) => {
+          earnings[wid] = (earnings[wid] || 0) + (parseFloat(p) / 100) * lt
+        })
+      } catch (e) {}
+    })
+    return earnings
+  }, [appState.lots, curMonth])
 
   const setItemField = (item, key, val) => updateLotItem(lotIdx, item.id, { [key]: val })
 
@@ -1029,16 +1107,94 @@ function FaccoesTab({ lot, lotIdx }) {
   }
 
   const addLotIncomeTx = async () => {
-    if (netResult <= 0) { addToast('Resultado precisa ser positivo para lançar', 'error'); return }
-    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${lot.name}`, value: netResult, date: todayStr(), account: 'Pix', paid: true })
+    if (lotTotal <= 0) { addToast('Valor Total do lote precisa estar preenchido', 'error'); return }
+    await addTx({ type: 'income', category: 'Trabalho Extra', description: `Facção - ${lot.name}`, value: lotTotal, date: todayStr(), account: 'Pix', paid: true })
     addToast(`Lote ${lot.name} lançado como receita!`)
   }
 
   return (
     <div>
       <LotInfoCard lot={lot} lotIdx={lotIdx} />
+
+      {/* ── PARTICIPANTES (junto ao cadastro) ── */}
       <div className="card">
-        <div className="card-title">🧵 Produção Geral</div>
+        <div className="card-title">👥 Participantes</div>
+        {workers.map(w => {
+          const pct = parseFloat(workerPcts[w.id] || 0)
+          const earned = (pct / 100) * lotTotal
+          const monthEarned = monthlyEarnings[w.id] || 0
+          return (
+            <div key={w.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>👤 {w.name}</div>
+                <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>% do lote:</span>
+                <input className="tbl-input" type="number" inputMode="decimal" value={pct || ''} placeholder="0" style={{ width: 60, textAlign: 'right' }} onChange={e => setWorkerPct(w.id, parseFloat(e.target.value) || 0)} />
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>%</span>
+                <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 15, color: '#4ade80' }}>{R$(earned)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                  Mês: <span style={{ color: '#60a5fa', fontWeight: 600 }}>{R$(monthEarned)}</span>
+                </div>
+                {earned > 0 && (
+                  <button className="btn btn-ghost btn-sm" style={{ color: '#4ade80', fontSize: 11, padding: '4px 10px' }} onClick={() => addFamilyIncomeTx(w.name, earned)}>
+                    📥 Lançar receita
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
+          <button className="btn btn-dark btn-sm" onClick={() => { if (newWorkerName.trim()) { addWorker(lotIdx, newWorkerName.trim()); setNewWorkerName('') } }}>+ Adicionar</button>
+        </div>
+      </div>
+
+      {/* ── PRODUÇÃO GERAL DO MÊS ── */}
+      <div className="card">
+        <div className="card-title">🧵 Produção Geral do Mês</div>
+        <div className="scroll-x">
+          <table className="tbl">
+            <thead><tr><th>REF</th><th>Produção</th><th>Cliente</th><th>Qtd</th><th>Vl/Pç</th><th>Total</th></tr></thead>
+            <tbody>
+              {monthLots.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '10px 0', fontSize: 12 }}>Nenhum lote com data de entrada neste mês</td></tr>
+              )}
+              {monthLots.map(({ lot: l, meta: m }) => {
+                const ref = l.name.split(' - ')[0] || l.name
+                const prod = l.name.split(' - ').slice(1).join(' - ') || l.name
+                const qty = parseInt(m.qtd_pecas) || 0
+                const vup = parseFloat(m.valor_unitario) || 0
+                const total = qty * vup
+                return (
+                  <tr key={l.id} style={{ opacity: l.id === lot.id ? 1 : 0.65 }}>
+                    <td style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{ref}</td>
+                    <td style={{ fontSize: 11 }}>{prod}</td>
+                    <td style={{ fontSize: 11 }}>{m.client || '—'}</td>
+                    <td style={{ fontSize: 11 }}>{qty || '—'}</td>
+                    <td style={{ fontSize: 11 }}>{vup > 0 ? R$(vup) : '—'}</td>
+                    <td style={{ fontWeight: 700, color: '#4ade80', fontSize: 12 }}>{total > 0 ? R$(total) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL DO MÊS</td>
+                <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(monthLots.reduce((s, { meta: m }) => s + (parseInt(m.qtd_pecas) || 0) * (parseFloat(m.valor_unitario) || 0), 0))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* ── ITENS DESTE LOTE ── */}
+      <div className="card">
+        <div className="card-title">📦 Itens deste Lote</div>
         <div className="scroll-x">
           <table className="tbl">
             <thead><tr><th>REF</th><th>Descrição</th><th>Valor/pç</th><th>Qtd</th><th>Total</th><th></th></tr></thead>
@@ -1092,99 +1248,46 @@ function FaccoesTab({ lot, lotIdx }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => addExpense(lotIdx)}>+ Gasto</button>
       </div>
 
-      {workers.map((w, wi) => {
-        const wi_items = w.worker_items || []
-        const workerEarned = items.reduce((s, item) => {
-          const p = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-          const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-          return s + (p / 100) * itemTotal
-        }, 0)
-        return (
-          <div key={w.id} className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div className="card-title" style={{ marginBottom: 0 }}>👤 {w.name}</div>
-              <button onClick={() => deleteWorker(lotIdx, w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16 }}>🗑</button>
-            </div>
-            <div className="scroll-x">
-              <table className="tbl">
-                <thead><tr><th>REF</th><th>Descrição</th><th>%</th><th>Valor</th></tr></thead>
-                <tbody>
-                  {items.map(item => {
-                    const pctVal = parseFloat(wi_items.find(x => x.lot_item_ref === item.ref)?.value || 0)
-                    const itemTotal = (parseFloat(item.value) || 0) * (parseInt(item.quantity) || 0)
-                    const earned_item = (pctVal / 100) * itemTotal
-                    return (
-                      <tr key={item.ref || item.id}>
-                        <td style={{ color: '#94a3b8', fontSize: 11 }}>{item.ref}</td>
-                        <td style={{ fontSize: 12 }}>{item.description}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <input className="tbl-input" type="number" inputMode="decimal" value={pctVal || ''} placeholder="0" style={{ width: 50, textAlign: 'right' }} onChange={e => updateWorkerItem(lotIdx, wi, item.ref, parseFloat(e.target.value) || 0)} />
-                            <span style={{ color: '#94a3b8', fontSize: 11 }}>%</span>
-                          </div>
-                        </td>
-                        <td style={{ color: '#4ade80', fontWeight: 600 }}>{R$(earned_item)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, fontSize: 12 }}>TOTAL</td>
-                    <td style={{ fontWeight: 700, color: '#4ade80' }}>{R$(workerEarned)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            {w.is_family_income && workerEarned > 0 && (
-              <button className="btn btn-ghost btn-sm" style={{ marginTop: 10, color: '#4ade80' }} onClick={() => addFamilyIncomeTx(w.name, workerEarned)}>
-                📥 Lançar como receita familiar
-              </button>
-            )}
-          </div>
-        )
-      })}
-
-      <div className="card">
-        <div className="card-title">👥 Participantes</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ flex: 1 }} />
-          <button className="btn btn-dark btn-sm" onClick={() => { if (newWorkerName.trim()) { addWorker(lotIdx, newWorkerName.trim()); setNewWorkerName('') } }}>+ Adicionar</button>
-        </div>
-      </div>
-
-      {totalProd > 0 && (
+      {(lotTotal > 0 || totalProd > 0) && (
         <div className="card">
-          <div className="card-title">📊 Relatório de Ganhos e Gastos</div>
-          <div style={{ textAlign: 'right', marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 2 }}>TOTAL</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: netResult >= 0 ? '#4ade80' : '#f87171' }}>{R$(netResult)}</div>
+          <div className="card-title">📊 Resumo do Lote</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 13, color: '#94a3b8' }}>Valor Total (Qtd × Vl/Pç)</span>
+            <span style={{ fontWeight: 700, color: '#4ade80' }}>{R$(lotTotal)}</span>
           </div>
           {totalExp > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ color: '#94a3b8' }}>(-) Gastos com facções</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 13, color: '#94a3b8' }}>(-) Gastos</span>
               <span style={{ fontWeight: 600, color: '#f87171' }}>- {R$(totalExp)}</span>
             </div>
           )}
-          {workers.length > 1 && (
-            <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Dividido para ({workers.map(w => w.name).join(' & ')})</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#60a5fa' }}>{R$(netResult / workers.length)}</div>
+          {workers.length > 0 && (
+            <div style={{ padding: '10px 0' }}>
+              {workers.map(w => {
+                const pct = parseFloat(workerPcts[w.id] || 0)
+                const earned = (pct / 100) * lotTotal
+                return earned > 0 ? (
+                  <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: '#94a3b8' }}>↳ {w.name} ({pct}%)</span>
+                    <span style={{ color: '#60a5fa' }}>{R$(earned)}</span>
+                  </div>
+                ) : null
+              })}
             </div>
           )}
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 10 }}>
             <div className="g2" style={{ gap: 8, alignItems: 'flex-end' }}>
               <div>
                 <label className="label">Dias trabalhados</label>
                 <input className="input" type="number" inputMode="numeric" value={lot.work_days || ''} placeholder="0" onChange={e => updateLot(lotIdx, { work_days: parseInt(e.target.value) || 0 })} />
               </div>
               <div className="stat">
-                <div className="stat-label">Preço do dia</div>
-                <div style={{ fontWeight: 700, fontSize: 18, color: '#fbbf24' }}>{days > 0 ? R$(dailyRate) : '—'}</div>
+                <div className="stat-label">Valor/dia</div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: '#fbbf24' }}>{days > 0 ? R$(lotTotal / days) : '—'}</div>
               </div>
             </div>
           </div>
-          {netResult > 0 && (
+          {lotTotal > 0 && (
             <button className="btn btn-dark btn-full" style={{ marginTop: 14 }} onClick={addLotIncomeTx}>
               📥 Lançar {lot.name} como receita do mês
             </button>
