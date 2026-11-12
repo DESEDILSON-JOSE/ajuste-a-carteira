@@ -88,7 +88,7 @@ function VisaoGeralTab({ biz }) {
 
       <div className="g2" style={{ marginBottom: 10, gap: 10 }}>
         <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 12, padding: '14px 16px' }}>
-          <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Receita Paga</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>Faturamento</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#4ade80' }}>{R$(totalRevenue)}</div>
           {pendingRevenue > 0 && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>+ {R$(pendingRevenue)} pendente</div>}
         </div>
