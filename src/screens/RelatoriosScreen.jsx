@@ -742,12 +742,13 @@ function OrcamentoTab({ transactions }) {
   )
 }
 
-// ─── CONTAS ────────────────────────────────────────────────
+// ─── CONTAS / PAGAMENTOS ──────────────────────────────────
 function ContasTab({ transactions }) {
   const now = new Date()
   const [selM, setSelM] = useState(now.getMonth() + 1)
   const [selY, setSelY] = useState(now.getFullYear())
   const [expanded, setExpanded] = useState(null)
+  const [viewMode, setViewMode] = useState('mensal')
 
   const changeMonth = (delta) => {
     let m = selM + delta, y = selY
@@ -756,15 +757,29 @@ function ContasTab({ transactions }) {
     setSelM(m); setSelY(y)
   }
 
-  const { monthTxs, byAccount, totals } = useMemo(() => {
-    const monthTxs = transactions.filter(t => {
-      const d = new Date(t.date + 'T12:00:00')
-      return d.getMonth() + 1 === selM && d.getFullYear() === selY
-    })
+  const ACC_COLOR = {
+    'Dinheiro': '#22c55e',
+    'Pix': '#38bdf8',
+    'Conta Corrente': '#a78bfa',
+    'Poupança': '#fb923c',
+    'Cartão de Crédito': '#f43f5e',
+    'Cartão de Débito': '#facc15',
+  }
 
-    // Group by account — use 'Dinheiro' as default when account not set
+  const { byAccount, totals } = useMemo(() => {
+    const filtered = viewMode === 'mensal'
+      ? transactions.filter(t => {
+          const d = new Date(t.date + 'T12:00:00')
+          return d.getMonth() + 1 === selM && d.getFullYear() === selY
+        })
+      : transactions.filter(t => {
+          const d = new Date(t.date + 'T12:00:00')
+          return d.getFullYear() === selY
+        })
+
     const byAccount = {}
-    monthTxs.forEach(t => {
+    ACCOUNTS.forEach(a => { byAccount[a] = { inc: 0, exp: 0, txs: [] } })
+    filtered.forEach(t => {
       const acc = t.account || 'Dinheiro'
       if (!byAccount[acc]) byAccount[acc] = { inc: 0, exp: 0, txs: [] }
       if (t.type === 'income') byAccount[acc].inc += t.value
@@ -773,119 +788,166 @@ function ContasTab({ transactions }) {
     })
 
     const totals = {
-      inc: monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0),
-      exp: monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0),
+      inc: filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.value, 0),
+      exp: filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.value, 0),
     }
 
-    return { monthTxs, byAccount, totals }
-  }, [transactions, selM, selY])
+    return { byAccount, totals }
+  }, [transactions, selM, selY, viewMode])
 
-  // Sort accounts: those with data first, ordered by total movement (inc + exp) desc
-  const accountEntries = Object.entries(byAccount).sort((a, b) => (b[1].inc + b[1].exp) - (a[1].inc + a[1].exp))
+  // Sort: accounts with transactions first, then by total movement desc
+  const accountEntries = Object.entries(byAccount).sort((a, b) => {
+    const aHas = a[1].txs.length > 0 ? 1 : 0
+    const bHas = b[1].txs.length > 0 ? 1 : 0
+    if (bHas !== aHas) return bHas - aHas
+    return (b[1].inc + b[1].exp) - (a[1].inc + a[1].exp)
+  })
 
   return (
     <div>
-      {/* Month selector */}
+      {/* View mode toggle */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button className={`btn btn-sm ${viewMode === 'mensal' ? 'btn-dark' : 'btn-ghost'}`} style={{ flex: 1 }} onClick={() => setViewMode('mensal')}>Mensal</button>
+        <button className={`btn btn-sm ${viewMode === 'anual' ? 'btn-dark' : 'btn-ghost'}`} style={{ flex: 1 }} onClick={() => setViewMode('anual')}>Anual</button>
+      </div>
+
+      {/* Period selector */}
       <div className="period-sel" style={{ justifyContent: 'center', marginBottom: 16 }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(-1)}>‹</button>
-        <span style={{ fontSize: 16, fontWeight: 700 }}>{MONTHS[selM - 1]} {selY}</span>
-        <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(1)}>›</button>
+        {viewMode === 'mensal' ? (
+          <>
+            <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(-1)}>‹</button>
+            <span style={{ fontSize: 16, fontWeight: 700 }}>{MONTHS[selM - 1]} {selY}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => changeMonth(1)}>›</button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelY(y => y - 1)}>‹</button>
+            <span style={{ fontSize: 16, fontWeight: 700 }}>{selY}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelY(y => y + 1)}>›</button>
+          </>
+        )}
       </div>
 
       {/* Total summary */}
-      <div className="g2" style={{ marginBottom: 12 }}>
+      <div className="g2" style={{ marginBottom: 16 }}>
         <div className="stat">
-          <div className="stat-label">Total Receitas</div>
-          <div className="stat-value" style={{ fontSize: 16, color: '#15803d' }}>{R$(totals.inc)}</div>
+          <div className="stat-label">↑ Receitas</div>
+          <div className="stat-value" style={{ fontSize: 15, color: '#15803d' }}>{R$(totals.inc)}</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Total Despesas</div>
-          <div className="stat-value" style={{ fontSize: 16, color: '#dc2626' }}>{R$(totals.exp)}</div>
+          <div className="stat-label">↓ Despesas</div>
+          <div className="stat-value" style={{ fontSize: 15, color: '#dc2626' }}>{R$(totals.exp)}</div>
         </div>
       </div>
 
-      {accountEntries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--cinza)' }}>
-          <div style={{ fontSize: 40 }}>💳</div>
-          <div style={{ marginTop: 8 }}>Nenhuma transação neste mês</div>
+      {/* Chart: despesas por forma de pagamento */}
+      {totals.exp > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-title" style={{ marginBottom: 12 }}>💳 Despesas por Forma de Pagamento</div>
+          {accountEntries.filter(([, d]) => d.exp > 0).map(([accName, data]) => {
+            const pctVal = totals.exp > 0 ? (data.exp / totals.exp) * 100 : 0
+            const color = ACC_COLOR[accName] || '#94a3b8'
+            const icon = ACCOUNT_ICON[accName] || '💳'
+            return (
+              <div key={accName} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{icon} {accName}</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>{R$(data.exp)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--cinza)', marginLeft: 6 }}>{pctVal.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${pctVal}%`, height: '100%', background: color, borderRadius: 6 }} />
+                </div>
+              </div>
+            )
+          })}
         </div>
-      ) : (
-        accountEntries.map(([accName, data]) => {
-          const saldo = data.inc - data.exp
-          const isOpen = expanded === accName
-          const icon = ACCOUNT_ICON[accName] || '💳'
+      )}
 
-          return (
-            <div key={accName} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden' }}>
-              {/* Account header — tap to expand */}
-              <button
-                onClick={() => setExpanded(isOpen ? null : accName)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '14px 16px', background: 'none', border: 'none',
-                  cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <span style={{ fontSize: 24 }}>{icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{accName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--cinza)', marginTop: 2 }}>
-                    {data.txs.length} transaç{data.txs.length === 1 ? 'ão' : 'ões'}
-                  </div>
+      {/* Cards por tipo de pagamento */}
+      {accountEntries.map(([accName, data]) => {
+        const saldo = data.inc - data.exp
+        const isOpen = expanded === accName
+        const icon = ACCOUNT_ICON[accName] || '💳'
+        const color = ACC_COLOR[accName] || '#94a3b8'
+        const isEmpty = data.txs.length === 0
+
+        return (
+          <div key={accName} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden', opacity: isEmpty ? 0.4 : 1 }}>
+            <button
+              onClick={() => !isEmpty && setExpanded(isOpen ? null : accName)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                padding: '14px 16px', background: 'none', border: 'none',
+                cursor: isEmpty ? 'default' : 'pointer', textAlign: 'left',
+              }}
+            >
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+                {icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{accName}</div>
+                <div style={{ fontSize: 12, color: 'var(--cinza)', marginTop: 1 }}>
+                  {isEmpty ? 'Sem movimentação' : `${data.txs.length} transaç${data.txs.length === 1 ? 'ão' : 'ões'}`}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: saldo >= 0 ? '#15803d' : '#dc2626' }}>
-                    {saldo >= 0 ? '+' : ''}{R$(saldo)}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--cinza)', marginTop: 2 }}>
-                    {isOpen ? '▲' : '▼'}
-                  </div>
-                </div>
-              </button>
-
-              {/* Expanded detail */}
-              {isOpen && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0 16px 12px' }}>
-                  {/* Inc / Exp row */}
-                  <div className="g2" style={{ marginTop: 12, marginBottom: 12 }}>
-                    <div style={{ background: 'rgba(34,197,94,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 2 }}>↑ Receitas</div>
-                      <div style={{ fontWeight: 700, color: '#15803d', fontSize: 14 }}>{R$(data.inc)}</div>
+              </div>
+              {!isEmpty && (
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  {data.exp > 0 && (
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#dc2626' }}>−{R$(data.exp)}</div>
+                  )}
+                  {data.inc > 0 && (
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>+{R$(data.inc)}</div>
+                  )}
+                  {data.inc > 0 && data.exp > 0 && (
+                    <div style={{ fontSize: 11, color: saldo >= 0 ? '#4ade80' : '#f87171', marginTop: 1 }}>
+                      saldo {saldo >= 0 ? '+' : ''}{R$(saldo)}
                     </div>
-                    <div style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: '#f87171', marginBottom: 2 }}>↓ Despesas</div>
-                      <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{R$(data.exp)}</div>
-                    </div>
-                  </div>
-
-                  {/* Transaction list */}
-                  {[...data.txs].sort((a, b) => b.date.localeCompare(a.date) || (a.description||"").localeCompare(b.description||"", "pt-BR")).map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13 }}>
-                      <span style={{ fontSize: 18 }}>{CAT_ICON[t.category] || '📌'}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description}</div>
-                        <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{t.category} · {fmtDate(t.date)}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontWeight: 700, color: t.type === 'income' ? '#15803d' : '#dc2626' }}>
-                          {t.type === 'income' ? '+' : '-'}{R$(t.value)}
-                        </div>
-                        {t.type === 'expense' && !t.paid && (
-                          <span className="badge badge-orange" style={{ fontSize: 10 }}>pendente</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--cinza)', marginTop: 2 }}>{isOpen ? '▲' : '▼'}</div>
                 </div>
               )}
-            </div>
-          )
-        })
-      )}
+            </button>
+
+            {isOpen && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0 16px 12px' }}>
+                <div className="g2" style={{ marginTop: 12, marginBottom: 12 }}>
+                  <div style={{ background: 'rgba(34,197,94,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 2 }}>↑ Receitas</div>
+                    <div style={{ fontWeight: 700, color: '#15803d', fontSize: 14 }}>{R$(data.inc)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#f87171', marginBottom: 2 }}>↓ Despesas</div>
+                    <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{R$(data.exp)}</div>
+                  </div>
+                </div>
+                {[...data.txs].sort((a, b) => b.date.localeCompare(a.date) || (a.description||'').localeCompare(b.description||'', 'pt-BR')).map(t => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13 }}>
+                    <span style={{ fontSize: 18 }}>{CAT_ICON[t.category] || '📌'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description}</div>
+                      <div style={{ fontSize: 11, color: 'var(--cinza)' }}>{t.category} · {fmtDate(t.date)}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontWeight: 700, color: t.type === 'income' ? '#15803d' : '#dc2626' }}>
+                        {t.type === 'income' ? '+' : '−'}{R$(t.value)}
+                      </div>
+                      {t.type === 'expense' && !t.paid && (
+                        <span className="badge badge-orange" style={{ fontSize: 10 }}>pendente</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
-
 // ─── MINHA CONTA ──────────────────────────────────────────
 function MinhaContaTab() {
   const { state, dispatch, logout, updateIncome, updatePwd, addToast } = useApp()
@@ -1216,7 +1278,7 @@ export default function RelatoriosScreen() {
 
       <div style={{ padding: '16px 16px 0' }}>
         <div className="tabs" style={{ marginTop: 12, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {[['babilonia', '🏛️ Babilônia'], ['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Contas'], ['conta', 'Conta']].map(([id, label]) => (
+          {[['babilonia', '🏛️ Babilônia'], ['7dias', '7 Dias'], ['mensal', 'Mensal'], ['anual', 'Anual'], ['orcamento', 'Orçamento'], ['contas', 'Pagamentos'], ['conta', 'Conta']].map(([id, label]) => (
             <button key={id} className={`tab${subTab === id ? ' active' : ''}`} style={{ flex: 'none', minWidth: 'max-content', padding: '9px 12px' }} onClick={() => setSubTab(id)}>{label}</button>
           ))}
         </div>
