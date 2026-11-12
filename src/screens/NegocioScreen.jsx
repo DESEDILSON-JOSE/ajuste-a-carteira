@@ -1057,7 +1057,6 @@ function LotInfoCard({ lot, lotIdx }) {
 function FaccoesTab({ lot, lotIdx }) {
   const { state: appState, updateLot, addLotItem, updateLotItem, deleteItem, addExpense, updateExpense, deleteExpense, addWorker, deleteWorker, addTx, deleteTx, addToast } = useApp()
   const [newWorkerName, setNewWorkerName] = useState('')
-  const [newWorkerIsIncome, setNewWorkerIsIncome] = useState(true)
   const [itemsView, setItemsView] = useState('lote')  // 'lote' | 'mes'
   const [meta, saveMeta] = useLotMeta(lot.id)
 
@@ -1182,40 +1181,22 @@ function FaccoesTab({ lot, lotIdx }) {
 
   const handleAddWorker = async () => {
     if (!newWorkerName.trim()) return
-    const w = await addWorker(lotIdx, newWorkerName.trim())
-    if (newWorkerIsIncome && w) {
-      const workerVal = calcWorkerValue(w.id)
-      const lot = appState.lots[lotIdx]
-      const saved = await addTx({
-        type: 'income',
-        description: `Facção – ${w.name}${lot?.description ? ' (' + lot.description + ')' : ''}`,
-        value: workerVal > 0 ? workerVal : 0,
-        date: todayStr(),
-        category: 'Negócio',
-        account: 'Pix',
-        paid: true,
-        notes: 'Receita de facção',
-      })
-      const txId = saved?.id
-      saveMeta({
-        worker_income: { ...workerIncome, [w.id]: true },
-        worker_tx_ids: { ...workerTxIds, [w.id]: txId || null },
-      })
-    }
+    await addWorker(lotIdx, newWorkerName.trim())
     setNewWorkerName('')
-    setNewWorkerIsIncome(true)
   }
 
   const handleDeleteWorker = (w) => {
     // Remove a transação de receita associada antes de deletar
     const txId = (meta.worker_tx_ids || {})[w.id]
     if (txId) deleteTx(txId)
-    // Limpa do meta
+    // Limpa TODOS os dados do participante do meta
     const updatedIncome = { ...(meta.worker_income || {}) }
     const updatedTxIds = { ...(meta.worker_tx_ids || {}) }
+    const updatedPcts = { ...(meta.worker_pcts || {}) }
     delete updatedIncome[w.id]
     delete updatedTxIds[w.id]
-    saveMeta({ worker_income: updatedIncome, worker_tx_ids: updatedTxIds })
+    delete updatedPcts[w.id]
+    saveMeta({ worker_income: updatedIncome, worker_tx_ids: updatedTxIds, worker_pcts: updatedPcts })
     deleteWorker(lotIdx, w.id)
   }
 
@@ -1387,15 +1368,9 @@ function FaccoesTab({ lot, lotIdx }) {
 
         {/* Adicionar novo participante */}
         <div style={{ marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)' }}>
-          <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} style={{ marginBottom: 8 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button
-              onClick={() => setNewWorkerIsIncome(v => !v)}
-              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', background: newWorkerIsIncome ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.08)', color: newWorkerIsIncome ? '#4ade80' : '#94a3b8' }}
-            >
-              {newWorkerIsIncome ? '💰 Vai entrar na receita mensal' : '➕ Adicionar à receita mensal?'}
-            </button>
-            <button className="btn btn-dark btn-sm" onClick={handleAddWorker}>+ Adicionar</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input className="input" placeholder="Nome da pessoa" value={newWorkerName} onChange={e => setNewWorkerName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddWorker()} style={{ marginBottom: 0, flex: 1 }} />
+            <button className="btn btn-dark btn-sm" onClick={handleAddWorker} style={{ whiteSpace: 'nowrap' }}>+ Adicionar</button>
           </div>
         </div>
       </div>
